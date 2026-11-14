@@ -50,5 +50,5 @@ combined_hist = analysis.binned_data + analysis.binned_data + analysis.binned_da
 
 print()
 print("The total number of photons has increased by a factor of 3, as expected:")
-print("single histogram: " + str(np.sum(analysis.binned_data.to_dense(copy=False).contents)))
-print("combined histogram: " + str(np.sum(combined_hist.to_dense(copy=False).contents)))
+print("single histogram: " + str(np.sum(analysis.binned_data.to_dense.contents)))
+print("combined histogram: " + str(np.sum(combined_hist.to_dense.contents)))
