@@ -9,7 +9,9 @@ analysis = BinnedData("inputs.yaml") # indica a cosipy di caricare la lista di f
 analysis.load_binned_data_from_hdf5("binned_data.hdf5")
 
 # Ad esempio, posso proiettare nell'asse del tempo
-analysis.binned_data.axes["Time"].centers
+centri_tempo = analysis.binned_data.axes["Time"].centers
+print("I centri dei bin del tempo sono: ", centri_tempo)
 
+# Ora genero lo spttro e la curva di luce
 analysis.get_raw_spectrum(binned_data="binned_data.hdf5", output_name="crab_spec", show_plots=True) # ottengo lo spettro
 analysis.get_raw_lightcurve(binned_data="binned_data.hdf5", output_name="crab_lc", show_plots=True) # ottengo la curva di luce
