@@ -33,8 +33,9 @@ ori_path = data_dir/"20280301_3_month_with_orbital_info.fits"
 response_path = data_dir/"SMEXv12.Continuum.HEALPixO3_10bins_log_flat.binnedimaging.imagingresponse.h5"
 
 # download orientation file ~684.38 MB
-fetch_wasabi_file("COSI-SMEX/DC3/Data/Orientation/20280301_3_month_with_orbital_info.fits", ori_path, checksum = '5e69bc1d55fab9390f90635690f62896')
+# Rimuovo l'argomento checksum dalla chiamata alla funzione
+fetch_wasabi_file("COSI-SMEX/DC3/Data/Orientation/20280301_3_month_with_orbital_info.fits", ori_path)
 
 # download response file ~596.06 MB
-fetch_wasabi_file("COSI-SMEX/cosipy_tutorials/Data/Responses/SMEXv12.Continuum.HEALPixO3_10bins_log_flat.binnedimaging.imagingresponse.h5", checksum = 'eb72400a1279325e9404110f909c7785')
-
+# Elimino anche qui il parametro checksum non supportato
+fetch_wasabi_file("COSI-SMEX/cosipy_tutorials/Data/Responses/SMEXv12.Continuum.HEALPixO3_10bins_log_flat.binnedimaging.imagingresponse.h5")
