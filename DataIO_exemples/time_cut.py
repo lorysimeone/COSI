@@ -5,13 +5,15 @@ import pandas as pd
 import numpy as np
 
 import logging
-logging.basicConfig(level=logging.INFO) # serve solo per avere le informazioni durante i caricamenti
+logging.basicConfig(level=logging.INFO) # Lo uso solo per avere le informazioni durante i caricamenti
 
 analysis = BinnedData("inputs_half_time.yaml")
-analysis.select_data_time(unbinned_data="combined_unbinned_data.hdf5", output_name="selected_unbinned_data")
-analysis.get_binned_data(unbinned_data="selected_unbinned_data.hdf5", output_name="selected_combined_binned_data")
+
+# Salto la selezione temporale e il binning poiché i file .hdf5 sono già presenti
 analysis.get_raw_spectrum(binned_data="selected_combined_binned_data.hdf5", output_name="selected_crab_spec_3x", show_plots=True)
+plt.figure()
 analysis.get_raw_lightcurve(binned_data="selected_combined_binned_data.hdf5", output_name="selected_crab_lc_3x", show_plots=True)
+plt.figure()
 
 # Comparo il dataset
 df = pd.read_csv("crab_lc_3x.dat", delimiter='\t')
