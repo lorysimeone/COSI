@@ -3,6 +3,9 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from cosipy import BinnedData # Importo la classe BinnedData
 
+# Disattivo la funzione show() per impedire che la figura venga svuotata prima del salvataggio
+plt.show = lambda *args, **kwargs: None
+
 import logging
 logging.basicConfig(level=logging.INFO) # serve solo per avere le informazioni durante i caricamenti
 
