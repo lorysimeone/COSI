@@ -1,39 +1,31 @@
-import numpy as np
-import astropy.units as u
-from astropy.units import Quantity
-from astropy.coordinates import SkyCoord
-from astropy.io import fits
-from astropy.time import Time
-
-import matplotlib.pyplot as plt
-import matplotlib.pyplot as ply
-
-from mhealpy import HealpixMap, HealpixBase
-import pandas as pd
+import os
 from pathlib import Path
 
-from scoords import Attitude, SpacecraftFrame
 from cosipy.response import FullDetectorResponse
-from cosipy.spacecraftfile import SpacecraftFile
-from cosipy import test_data
 from cosipy.util import fetch_wasabi_file
-from histpy import Histogram
-import gc
 
-from threeML import Model, Powerlaw
+# 1. Definisco i percorsi
+data_dir = Path("./")
+ori_path = data_dir / "20280301_3_month_with_orbital_info.fits"
+rsp_filename = "ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5"
+rsp_path = data_dir / rsp_filename
 
-from cosipy.response import FullDetectorResponse
+# 2. Scarico i file da Wasabi
+print("Scaricamento file di orientamento...")
+fetch_wasabi_file(
+    "COSI-SMEX/DC3/Data/Orientation/20280301_3_month_with_orbital_info.fits",
+    ori_path
+)
 
-import shutil
-import os
+print("Scaricamento nuova risposta del rivelatore (DC4)...")
+fetch_wasabi_file(
+    f"COSI-SMEX/DC4/Data/Responses/{rsp_filename}",
+    output=str(rsp_path),
+    checksum="7121f094be50e7bfe9b31e53015b0e85",
+    overwrite=True
+)
 
-data_dir = Path("") # Current directory by default. Modify if you can want a different path
-
-ori_path = data_dir/"20280301_3_month_with_orbital_info.fits"
-response_path = data_dir/"SMEXv12.Continuum.HEALPixO3_10bins_log_flat.binnedimaging.imagingresponse.h5"
-
-# download orientation file ~684.38 MB
-fetch_wasabi_file("COSI-SMEX/DC3/Data/Orientation/20280301_3_month_with_orbital_info.fits", ori_path)
-
-# download response file ~596.06 MB
-fetch_wasabi_file("COSI-SMEX/cosipy_tutorials/Data/Responses/SMEXv12.Continuum.HEALPixO3_10bins_log_flat.binnedimaging.imagingresponse.h5")
+# 3. Apro e verifico la risposta
+with FullDetectorResponse.open(rsp_path) as response:
+    print("\nRisposta del rivelatore caricata con successo!")
+    print(repr(response))
