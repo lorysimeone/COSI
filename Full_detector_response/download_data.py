@@ -14,7 +14,7 @@ from pathlib import Path
 
 from scoords import Attitude, SpacecraftFrame
 from cosipy.response import FullDetectorResponse
-from cosipy.spacecraftfile import SpacecraftHistory
+from cosipy.spacecraftfile import SpacecraftFile
 from cosipy import test_data
 from cosipy.util import fetch_wasabi_file
 from histpy import Histogram
