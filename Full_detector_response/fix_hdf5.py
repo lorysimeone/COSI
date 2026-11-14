@@ -37,22 +37,28 @@ with h5py.File(file_path, "r+") as f:
                 axis.attrs["TYPE"] = axis_type
                 print(f"Ho aggiunto l'attributo TYPE='{axis_type}' all'asse {axis_name}.")
 
-            # Verifico il tipo attuale dell'asse per controllare NSIDE
+            # Verifico il tipo attuale dell'asse per controllare NSIDE e SCHEME
             current_type = axis.attrs.get("TYPE", "")
             if isinstance(current_type, bytes):
                 current_type = current_type.decode('utf-8')
 
-            # Applico la modifica per NSIDE solo se l'asse è healpix e l'attributo manca
-            if current_type == "healpix" and "NSIDE" not in axis.attrs:
-                # Deduco i pixel spaziali totali dalla lunghezza del dataset escludendo il bin di overflow (1)
-                n_pixels = axis.shape[0] - 1
+            # Applico la modifica per NSIDE e SCHEME solo se l'asse è healpix
+            if current_type == "healpix":
+                if "NSIDE" not in axis.attrs:
+                    # Deduco i pixel spaziali totali dalla lunghezza del dataset escludendo il bin di overflow (1)
+                    n_pixels = axis.shape[0] - 1
 
-                # Calcolo NSIDE ricavandolo matematicamente dalla formula N_pixels = 12 * NSIDE^2
-                nside = int(np.sqrt(n_pixels / 12))
+                    # Calcolo NSIDE ricavandolo matematicamente dalla formula N_pixels = 12 * NSIDE^2
+                    nside = int(np.sqrt(n_pixels / 12))
 
-                # Assegno fisicamente l'attributo nel file
-                axis.attrs["NSIDE"] = nside
-                print(f"Ho aggiunto l'attributo NSIDE={nside} all'asse {axis_name}.")
+                    # Assegno fisicamente l'attributo nel file
+                    axis.attrs["NSIDE"] = nside
+                    print(f"Ho aggiunto l'attributo NSIDE={nside} all'asse {axis_name}.")
+
+                if "SCHEME" not in axis.attrs:
+                    # Assegno lo schema standard 'ring'
+                    axis.attrs["SCHEME"] = "ring"
+                    print(f"Ho aggiunto l'attributo SCHEME='ring' all'asse {axis_name}.")
 
         print("Aggiornamento del file HDF5 completato con successo.")
     else:
