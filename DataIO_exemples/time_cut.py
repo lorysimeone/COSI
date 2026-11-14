@@ -1,0 +1,26 @@
+import matplotlib
+import matplotlib.pyplot as plt
+from cosipy import BinnedData # Importo la classe BinnedData
+import pandas as pd
+import numpy as np
+
+import logging
+logging.basicConfig(level=logging.INFO) # serve solo per avere le informazioni durante i caricamenti
+
+analysis = BinnedData("inputs_half_time.yaml")
+analysis.select_data_time(unbinned_data="combined_unbinned_data.hdf5", output_name="selected_unbinned_data")
+analysis.get_binned_data(unbinned_data="selected_unbinned_data.hdf5", output_name="selected_combined_binned_data")
+analysis.get_raw_spectrum(binned_data="selected_combined_binned_data.hdf5", output_name="selected_crab_spec_3x", show_plots=True)
+analysis.get_raw_lightcurve(binned_data="selected_combined_binned_data.hdf5", output_name="selected_crab_lc_3x", show_plots=True)
+
+# Comparo il dataset
+df = pd.read_csv("crab_lc_3x.dat", delimiter='\t')
+plt.semilogy(df["Time[UTC]"] - df["Time[UTC]"][0], df["Rate[ct/s]"],ls="-",label="Combined")
+
+df = pd.read_csv("selected_crab_lc_3x.dat", delimiter='\t')
+plt.semilogy(df["Time[UTC]"] - df["Time[UTC]"][0], df["Rate[ct/s]"],ls="--",label="Selected Combined")
+
+plt.legend()
+plt.xlabel("Time [s]")
+plt.ylabel("ct/s")
+plt.savefig("combined_lc_comparison.pdf")
