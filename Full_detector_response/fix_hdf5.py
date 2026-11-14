@@ -45,10 +45,10 @@ with h5py.File(file_path, "r+") as f:
             # Applico la modifica per NSIDE e SCHEME solo se l'asse è healpix
             if current_type == "healpix":
                 if "NSIDE" not in axis.attrs:
-                    # Deduco i pixel spaziali totali dalla lunghezza del dataset escludendo il bin di overflow (1)
+                    # Deduco il numero di pixel spaziali dalla lunghezza del dataset escludendo il bin di overflow (1)
                     n_pixels = axis.shape[0] - 1
 
-                    # Calcolo NSIDE ricavandolo matematicamente dalla formula N_pixels = 12 * NSIDE^2
+                    # Calcolo NSIDE ricavandolo matematicamente dalla formula
                     nside = int(np.sqrt(n_pixels / 12))
 
                     # Assegno fisicamente l'attributo nel file
@@ -59,6 +59,12 @@ with h5py.File(file_path, "r+") as f:
                     # Assegno lo schema standard 'ring'
                     axis.attrs["SCHEME"] = "ring"
                     print(f"Ho aggiunto l'attributo SCHEME='ring' all'asse {axis_name}.")
+
+            # Controllo se manca l'attributo UNIT e lo aggiungo con una stringa vuota
+            if "UNIT" not in axis.attrs:
+                # Imposto un'unità vuota che astropy interpreta senza errori
+                axis.attrs["UNIT"] = ""
+                print(f"Ho aggiunto l'attributo UNIT='' all'asse {axis_name}.")
 
         print("Aggiornamento del file HDF5 completato con successo.")
     else:
