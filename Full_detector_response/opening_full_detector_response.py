@@ -27,8 +27,6 @@ from cosipy.response import FullDetectorResponse
 import shutil
 import os
 
-response = FullDetectorResponse.open("/heronas/simeone/COSI/Full_detector_response/SMEXv12.Continuum.HEALPixO3_10bins_log_flat.binnedimaging.imagingresponse.h5")
+with FullDetectorResponse.open("/heronas/simeone/COSI/Full_detector_response/SMEXv12.Continuum.HEALPixO3_10bins_log_flat.binnedimaging.imagingresponse.h5") as response:
 
-print(response.filename)
-
-response.close()
+    print(repr(response))
