@@ -1,5 +1,4 @@
 import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from cosipy import BinnedData # Importo la classe BinnedData
 
@@ -10,10 +9,6 @@ analysis = BinnedData("inputs.yaml") # inputs.yaml definisce i parametri di inpu
 analysis.read_tra(output_name="unbinned_data") # legge il file grezzo in formato .tra e lo converte in un dataset non binnato
 
 analysis.get_binned_data() # i dati vengono binnati su 4 assi
+# Plotto su schermo lo spettro e la curva di luce grezzi
 analysis.get_raw_spectrum(show_plots=False)
-plt.savefig('spectrum.png') # Salvo lo spettro in un file PNG sul disco
-plt.clf()
-
-# LC in plot below is normalized to initial time.
-fig_lc = analysis.get_raw_lightcurve(show_plots=False)
-fig_lc.savefig('lightcurve.png')
+analysis.get_raw_lightcurve(show_plots=False)
