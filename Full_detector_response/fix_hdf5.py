@@ -66,6 +66,12 @@ with h5py.File(file_path, "r+") as f:
                 axis.attrs["UNIT"] = ""
                 print(f"Ho aggiunto l'attributo UNIT='' all'asse {axis_name}.")
 
+            # Imposto forzatamente i nomi corretti previsti da cosipy per i 5 assi standard
+            nomi_assi = {"0": "NuLambda", "1": "Ei", "2": "Em", "3": "Phi", "4": "PsiChi"}
+            if axis_name in nomi_assi:
+                axis.attrs["NAME"] = nomi_assi[axis_name]
+                print(f"Ho impostato l'attributo NAME='{nomi_assi[axis_name]}' all'asse {axis_name}.")
+
         print("Aggiornamento del file HDF5 completato con successo.")
     else:
         print("Non trovo il gruppo AXES nel file.")
