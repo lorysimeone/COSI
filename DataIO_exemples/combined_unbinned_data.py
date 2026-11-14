@@ -42,3 +42,13 @@ plt.legend()
 plt.xlabel("Energy [keV]")
 plt.ylabel("ct/keV")
 plt.savefig("combined_spectrum_comparison.pdf")
+
+# In alternativa, sommo gli istogrammi
+analysis = BinnedData("inputs.yaml")
+analysis.get_binned_data(unbinned_data="unbinned_data.hdf5", output_name="binned_data")
+combined_hist = analysis.binned_data + analysis.binned_data + analysis.binned_data
+
+print()
+print("The total number of photons has increased by a factor of 3, as expected:")
+print("single histogram: " + str(np.sum(analysis.binned_data.to_dense(copy=False).contents)))
+print("combined histogram: " + str(np.sum(combined_hist.to_dense(copy=False).contents)))
