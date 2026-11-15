@@ -27,7 +27,8 @@ from cosipy.response import FullDetectorResponse
 import shutil
 import os
 
-response = FullDetectorResponse.open('/heronas/simeone/COSI/Full_detector_response/dc4_data/ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5')
+response_path = '/heronas/simeone/COSI/Full_detector_response/dc4_data/ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5'
+response = FullDetectorResponse.open(response_path)
 
 print(response.filename) # legge il file
 
