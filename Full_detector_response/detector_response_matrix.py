@@ -43,3 +43,5 @@ with FullDetectorResponse.open(response_path) as response: # apre il file, legge
     drm = response.get_interp_response(SkyCoord(lon=58 * u.deg, lat=65 * u.deg, frame=SpacecraftFrame())) # ottengo la matrice in una specifica direzione
     print(drm)
 
+    drm.axes.labels
+
