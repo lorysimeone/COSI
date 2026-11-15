@@ -35,7 +35,11 @@ with FullDetectorResponse.open(response_path) as response: # apre il file, legge
     print(f"NPIX = {response.npix}")
     print(f"Pixel size = {np.sqrt(response.pixarea()).to(u.deg):.2f}")
 
-    print(f"Pixel 0 centered at {response.pix2skycoord(0)}")
-    drm = response[0] # ottengo la risposta di uno specifico pixel
+    print(f"Pixel 35 centered at {response.pix2skycoord(0)}")
+    drm = response[35] # ottengo la risposta di uno specifico pixel
+    print(drm)
+
+    print("Matrix for a specific direction: ")
+    drm = response.get_interp_response(SkyCoord(lon=58 * u.deg, lat=65 * u.deg, frame=SpacecraftFrame())) # ottengo la matrice in una specifica direzione
     print(drm)
 
