@@ -35,7 +35,7 @@ import shutil
 import os
 
 response_path = '/heronas/simeone/COSI/Full_detector_response/dc4_data/ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5'
-ori_path = '/heronas/simeone/COSI/Full_detector_response/dc4_data/dc4_data/DC4_final_530km_3_month_with_slew_1sbins_GalacticEarth_SAA.fits'
+ori_path = '/heronas/simeone/COSI/Full_detector_response/dc4_data/DC4_final_530km_3_month_with_slew_1sbins_GalacticEarth_SAA.fits'
 
 # Leggo l'orientazione
 ori = SpacecraftHistory.open(ori_path)
