@@ -26,3 +26,5 @@ with FullDetectorResponse.open(response_path) as response: # apre il file, legge
     ax.figure.savefig("effective_area.png", dpi=200, bbox_inches="tight")
     plt.close(ax.figure)
 
+    print(f'Area efficace interpolata: {drm.get_effective_area(511 * u.keV)}')
+
