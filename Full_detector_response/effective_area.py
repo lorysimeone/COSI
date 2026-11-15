@@ -15,7 +15,7 @@ with FullDetectorResponse.open(response_path) as response: # apre il file, legge
     drm = response.get_interp_response(
         SkyCoord(lon=0 * u.deg, lat=90 * u.deg, frame=SpacecraftFrame()))
 
-    # Proiezione sugli assi Ei ed Em e disegno
+    # Matrice di risposta
     ax, plot = drm.get_spectral_response().plot()
     ax.figure.savefig("spectral_response.png", dpi=200, bbox_inches="tight")
     plt.close(ax.figure)
@@ -26,5 +26,9 @@ with FullDetectorResponse.open(response_path) as response: # apre il file, legge
     ax.figure.savefig("effective_area.png", dpi=200, bbox_inches="tight")
     plt.close(ax.figure)
 
-    print(f'Area efficace interpolata: {drm.get_effective_area(511 * u.keV)}')
+    print(f'Area efficace interpolata: {drm.get_effective_area(511 * u.keV)}') # Area efficace totale per tutte le Em
 
+    # Matrice di dispersione
+    ax, plot = drm.get_dispersion_matrix().plot()
+    ax.figure.savefig("dispersion_matrix.png", dpi=200, bbox_inches="tight")
+    plt.close(ax.figure)
