@@ -1,25 +1,15 @@
-import os
 from pathlib import Path
-from cosipy.response import FullDetectorResponse
 from cosipy.util import fetch_wasabi_file
 
-# 1. Definisco i percorsi
-data_dir = Path("./")
-ori_path = data_dir / "20280301_3_month_with_orbital_info.fits"
-rsp_filename = "ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5"
-rsp_path = data_dir / rsp_filename
+data_dir = Path("dc4_data")
+data_dir.mkdir(exist_ok=True)
 
-# 2. Scarico i file da Wasabi
-print("Scaricamento file di orientamento...")
-fetch_wasabi_file(
-    "COSI-SMEX/DC3/Data/Orientation/20280301_3_month_with_orbital_info.fits",
-    ori_path,
-)
+ori_name = "DC4_final_530km_3_month_with_slew_1sbins_GalacticEarth_SAA.fits"
+resp_name = ("ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284."
+             "filtered.nonsparse.binnedimaging.imagingresponse.h5")
 
-print("Scaricamento nuova risposta del rivelatore (DC4)...")
-fetch_wasabi_file(f"COSI-SMEX/DC4/Data/Responses/{rsp_filename}", rsp_path)
+ori_path = data_dir / ori_name
+response_path = data_dir / resp_name
 
-# 3. Apro e verifico la risposta
-with FullDetectorResponse.open(rsp_path) as response:
-    print("\nRisposta del rivelatore caricata con successo!")
-    print(repr(response))
+fetch_wasabi_file(f"COSI-SMEX/DC4/Data/Orientation/{ori_name}", ori_path)
+fetch_wasabi_file(f"COSI-SMEX/DC4/Data/Responses/{resp_name}", response_path)
