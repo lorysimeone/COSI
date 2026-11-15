@@ -1,32 +1,34 @@
-import os
+import numpy as np
+import astropy.units as u
+from astropy.units import Quantity
+from astropy.coordinates import SkyCoord
+from astropy.io import fits
+from astropy.time import Time
+
+import matplotlib.pyplot as plt
+import matplotlib.pyplot as ply
+
+from mhealpy import HealpixMap, HealpixBase
+import pandas as pd
 from pathlib import Path
-import h5py
+
+from scoords import Attitude, SpacecraftFrame
+from cosipy.response import FullDetectorResponse
+from cosipy.spacecraftfile import SpacecraftHistory
+from cosipy import test_data
+from cosipy.util import fetch_wasabi_file
+from histpy import Histogram
+import gc
+
+from threeML import Model, Powerlaw
+
 from cosipy.response import FullDetectorResponse
 
-# Definisco i percorsi di lavoro
-data_dir = Path("./")
-ori_path = data_dir / "20280301_3_month_with_orbital_info.fits"
-rsp_filename = "ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5"
-rsp_path = data_dir / rsp_filename
+import shutil
+import os
 
-# Definisco la funzione ricorsiva per applicare la patch a tutti gli attributi mancanti
-print("Verifica e patch ricorsiva estesa della struttura HDF5...")
-def patch_node(name, obj):
-    if hasattr(obj, 'attrs'):
-        if 'TYPE' not in obj.attrs:
-            obj.attrs['TYPE'] = 'generic'
-        if 'UNIT' not in obj.attrs:
-            obj.attrs['UNIT'] = 'dimensionless'
+response = FullDetectorResponse.open('/heronas/simeone/COSI/Full_detector_response/dc4_data/ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5')
 
-with h5py.File(rsp_path, "a") as f:
-    f.visititems(patch_node)
-    if 'TYPE' not in f.attrs:
-        f.attrs['TYPE'] = 'generic'
-    if 'UNIT' not in f.attrs:
-        f.attrs['UNIT'] = 'dimensionless'
+print(response.filename)
 
-# Apro e verifico la risposta del rivelatore
-print("Apro e verifico la risposta...")
-with FullDetectorResponse.open(rsp_path) as response:
-    print("\nRisposta del rivelatore caricata con successo!")
-    print(repr(response))
+response.close()
