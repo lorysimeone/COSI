@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-
 from cosipy.response import FullDetectorResponse
 from cosipy.util import fetch_wasabi_file
 
@@ -14,16 +13,11 @@ rsp_path = data_dir / rsp_filename
 print("Scaricamento file di orientamento...")
 fetch_wasabi_file(
     "COSI-SMEX/DC3/Data/Orientation/20280301_3_month_with_orbital_info.fits",
-    ori_path
+    ori_path,
 )
 
 print("Scaricamento nuova risposta del rivelatore (DC4)...")
-fetch_wasabi_file(
-    f"COSI-SMEX/DC4/Data/Responses/{rsp_filename}",
-    output=str(rsp_path),
-    checksum="7121f094be50e7bfe9b31e53015b0e85",
-    overwrite=True
-)
+fetch_wasabi_file(f"COSI-SMEX/DC4/Data/Responses/{rsp_filename}", rsp_path)
 
 # 3. Apro e verifico la risposta
 with FullDetectorResponse.open(rsp_path) as response:
