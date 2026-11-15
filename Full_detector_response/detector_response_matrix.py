@@ -37,4 +37,5 @@ with FullDetectorResponse.open(response_path) as response: # apre il file, legge
 
     print(f"Pixel 0 centered at {response.pix2skycoord(0)}")
     drm = response[0] # ottengo la risposta di uno specifico pixel
+    print(drm)
 
