@@ -17,7 +17,12 @@ with FullDetectorResponse.open(response_path) as response: # apre il file, legge
 
     # Proiezione sugli assi Ei ed Em e disegno
     ax, plot = drm.get_spectral_response().plot()
+    ax.figure.savefig("spectral_response.png", dpi=200, bbox_inches="tight")
+    plt.close(ax.figure)
 
-ax.figure.savefig("spectral_response.png", dpi=200, bbox_inches="tight")
-plt.close(ax.figure)
-print("Salvato: spectral_response.png")
+    # Proiezione su Ei dell'area efficace
+    ax, plot = drm.get_effective_area().plot()
+    ax.set_ylabel(f'Aeff [{drm.unit}]')
+    ax.figure.savefig("effective_area.png", dpi=200, bbox_inches="tight")
+    plt.close(ax.figure)
+
