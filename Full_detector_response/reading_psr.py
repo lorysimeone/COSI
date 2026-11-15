@@ -24,6 +24,7 @@ from cosipy.response import FullDetectorResponse
 from cosipy.spacecraftfile import SpacecraftHistory
 from cosipy import test_data
 from cosipy.util import fetch_wasabi_file
+from cosipy.response import PointSourceResponse
 from histpy import Histogram
 import gc
 
