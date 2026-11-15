@@ -32,6 +32,6 @@ response = FullDetectorResponse.open(response_path)
 
 print(response.filename) # legge il file
 
-with FullDetectorResponse.open(response_path) as response:
+with FullDetectorResponse.open(response_path) as response: # apre il file, legge l'header e chiude il file
 
     print(repr(response))
