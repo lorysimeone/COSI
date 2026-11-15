@@ -29,6 +29,8 @@ import os
 
 response = FullDetectorResponse.open('/heronas/simeone/COSI/Full_detector_response/dc4_data/ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5')
 
-print(response.filename)
+print(response.filename) # legge il file
 
-response.close()
+with FullDetectorResponse.open(response_path) as response:
+
+    print(repr(response))
