@@ -35,7 +35,7 @@ with FullDetectorResponse.open(response_path) as response: # apre il file, legge
     print(f"NPIX = {response.npix}")
     print(f"Pixel size = {np.sqrt(response.pixarea()).to(u.deg):.2f}")
 
-    print(f"Pixel 35 centered at {response.pix2skycoord(0)}")
+    print(f"Pixel 35 centered at {response.pix2skycoord(35)}")
     drm = response[35] # ottengo la risposta di uno specifico pixel
     print(drm)
 
