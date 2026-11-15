@@ -50,3 +50,5 @@ with FullDetectorResponse.open(response_path) as response:
     # Ottengo la point spread response (PSR) convolvendo la mappa di rilevazione con la risposta del rilevatore
     psr = response.get_point_source_response(exposure_map = dwell_time_map, coord = target_coord)
     print(f'Unit = {psr.unit}')
+    psr.write("psr_crab_DC4.h5", overwrite=True)
+    print("PSR salvata")
