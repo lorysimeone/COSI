@@ -173,3 +173,86 @@ like = JointLikelihood(model, plugins, verbose = False) # calcola la verosomigli
 results, like_df = like.fit()
 print(results)
 print(like_df)
+
+# Definisco la funzione di Band della simulazione per il plot
+alpha_inj = -1.99
+beta_inj = -2.32
+E0_inj = 531. * (alpha_inj - beta_inj) * u.keV
+xp_inj = E0_inj * (alpha_inj + 2) / (alpha_inj - beta_inj)
+piv_inj = 100. * u.keV
+K_inj = 7.56e-4 / u.cm / u.cm / u.s / u.keV
+
+spectrum_inj = Band()
+
+spectrum_inj.alpha.min_value = -2.14
+spectrum_inj.alpha.max_value = 3.0
+spectrum_inj.beta.min_value = -5.0
+spectrum_inj.beta.max_value = -2.15
+spectrum_inj.xp.min_value = 1.0
+
+spectrum_inj.alpha.value = alpha_inj
+spectrum_inj.beta.value = beta_inj
+spectrum_inj.xp.value = xp_inj.value
+spectrum_inj.K.value = K_inj.value
+spectrum_inj.piv.value = piv_inj.value
+
+spectrum_inj.xp.unit = xp_inj.unit
+spectrum_inj.K.unit = K_inj.unit
+spectrum_inj.piv.unit = piv_inj.unit
+
+# Definisco i risultati per il confronto
+
+results = like.results
+
+print(results.display())
+
+parameters = {par.name:results.get_variates(par.path)
+              for par in results.optimized_model["source"].parameters.values()
+              if par.free}
+
+results_err = results.propagate(results.optimized_model["source"].spectrum.main.shape.evaluate_at, **parameters)
+
+print(results.optimized_model["source"])
+
+# Definisco il flusso e gli errori nei range utilizzati per il fit e nei dati immessi
+energy = np.geomspace(100*u.keV,10*u.MeV).to_value(u.keV)
+
+flux_lo = np.zeros_like(energy)
+flux_median = np.zeros_like(energy)
+flux_hi = np.zeros_like(energy)
+flux_inj = np.zeros_like(energy)
+
+for i, e in enumerate(energy):
+    flux = results_err(e)
+    flux_median[i] = flux.median
+    flux_lo[i], flux_hi[i] = flux.equal_tail_interval(cl=0.68)
+    flux_inj[i] = spectrum_inj.evaluate_at(e)
+
+binned_energy_edges = crab.binned_data.axes['Em'].edges.value
+binned_energy = np.array([])
+bin_sizes = np.array([])
+
+for i in range(len(binned_energy_edges)-1):
+    binned_energy = np.append(binned_energy, (binned_energy_edges[i+1] + binned_energy_edges[i]) / 2)
+    bin_sizes = np.append(bin_sizes, binned_energy_edges[i+1] - binned_energy_edges[i])
+
+expectation = response.expectation()
+
+# Plotto lo spettro immesso e lo spettro fittato
+fig,ax = plt.subplots()
+
+ax.plot(energy, energy*energy*flux_median, label = "Best fit")
+ax.fill_between(energy, energy*energy*flux_lo, energy*energy*flux_hi, alpha = .5, label = "Best fit (errors)")
+ax.plot(energy, energy*energy*flux_inj, color = 'black', ls = ":", label = "Injected")
+
+ax.set_xscale("log")
+ax.set_yscale("log")
+
+ax.set_xlabel("Energy (keV)")
+ax.set_ylabel(r"$E^2 \frac{dN}{dE}$ (keV cm$^{-2}$ s$^{-1}$)")
+
+ax.set_ylim(.1,100)
+
+_ = ax.legend()
+
+ax.figure.savefig("injected_fit.png", dpi=200, bbox_inches="tight")
