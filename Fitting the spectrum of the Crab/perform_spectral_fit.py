@@ -255,4 +255,45 @@ ax.set_ylim(.1,100)
 
 _ = ax.legend()
 
-ax.figure.savefig("injected_fit.png", dpi=200, bbox_inches="tight")
+ax.figure.savefig("injected_vs_fit.png", dpi=200, bbox_inches="tight")
+
+# Plotto lo spettro convoluto con la risposta e lo spettro fittato
+
+fig,ax = plt.subplots()
+
+ax.stairs(expectation.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='purple', label = "Best fit convolved with response")
+ax.errorbar(binned_energy, expectation.project('Em').to_dense(copy=False).contents, yerr=np.sqrt(expectation.project('Em').to_dense(copy=False).contents), color='purple', linewidth=0, elinewidth=1)
+ax.stairs(crab.binned_data.project('Em').to_dense(copy=False).contents, binned_energy_edges, color = 'black', ls = ":", label = "Source counts")
+ax.errorbar(binned_energy, crab.binned_data.project('Em').to_dense(copy=False).contents, yerr=np.sqrt(crab.binned_data.project('Em').to_dense(copy=False).contents), color='black', linewidth=0, elinewidth=1)
+
+ax.set_xscale("log")
+ax.set_yscale("log")
+
+ax.set_xlabel("Energy (keV)")
+ax.set_ylabel("Counts")
+
+_ = ax.legend()
+
+ax.figure.savefig("convolved_spectrum_vs_fit.png", dpi=200, bbox_inches="tight")
+
+# Aggiungo il fondo
+expectation_bkg = bkg.expectation(copy = True)
+
+fig,ax = plt.subplots()
+
+ax.stairs(expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='purple', label = "Best fit convolved with response plus background")
+ax.errorbar(binned_energy, expectation.project('Em').to_dense(copy=False).contents+expectation_bkg.project('Em').to_dense(copy=False).contents, yerr=np.sqrt(expectation.project('Em').to_dense(copy=False).contents+expectation_bkg.project('Em').to_dense(copy=False).contents), color='purple', linewidth=0, elinewidth=1)
+ax.stairs(data.data.project('Em').to_dense(copy=False).contents, binned_energy_edges, color = 'black', ls = ":", label = "Total counts")
+ax.errorbar(binned_energy, data.data.project('Em').to_dense(copy=False).contents, yerr=np.sqrt(data.data.project('Em').to_dense(copy=False).contents), color='black', linewidth=0, elinewidth=1)
+
+ax.set_xscale("log")
+ax.set_yscale("log")
+
+ax.set_xlabel("Energy (keV)")
+ax.set_ylabel("Counts")
+
+ax.legend()
+
+plt.show()
+
+ax.figure.savefig("convolved_spectrum_vs_fit_with_background.png", dpi=200, bbox_inches="tight")
