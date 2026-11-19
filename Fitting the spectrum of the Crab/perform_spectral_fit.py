@@ -26,6 +26,9 @@ from astromodels import Parameter, Powerlaw
 
 from pathlib import Path
 
+# Carico il file di orientazione
+sc_orientation = SpacecraftHistory.open(data_path / "20280301_3_month_with_orbital_info.fits")
+
 # Scarico i dati del fondo
 single_bkg_fit = True # tratto il fondo come un'unica componente
 bkg_components = {"PrimaryProtons":{'filename':'PrimaryProtons_WithDetCstbinned_data_filtered_with_SAAcut.hdf5', 'checksum':'7597f04210e59340a0888c66fc5cbc63'},
