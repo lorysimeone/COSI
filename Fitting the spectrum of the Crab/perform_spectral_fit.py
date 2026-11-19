@@ -26,6 +26,8 @@ from astromodels import Parameter, Powerlaw
 
 from pathlib import Path
 
+data_path = Path("/heronas/simeone/COSI/crab_data")
+
 # Carico il file di orientazione
 sc_orientation = SpacecraftHistory.open(data_path / "20280301_3_month_with_orbital_info.fits")
 
