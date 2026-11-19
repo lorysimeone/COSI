@@ -8,14 +8,16 @@ from cosipy.background_estimation import FreeNormBinnedBackground
 from cosipy.interfaces import ThreeMLPluginInterface
 from cosipy.response import BinnedThreeMLModelFolding, BinnedInstrumentResponse, BinnedThreeMLPointSourceResponse
 from cosipy.data_io import EmCDSBinnedData
+logging.basicConfig(level=logging.INFO) # serve solo per avere le informazioni durante i caricamenti
 
 import sys
 
 import astropy.units as u
 
 import numpy as np
-import matplotlib.pyplot as plt
+import matplotlib
 matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 from threeML import Band, PointSource, Model, JointLikelihood, DataList
 from astromodels import Parameter, Powerlaw
