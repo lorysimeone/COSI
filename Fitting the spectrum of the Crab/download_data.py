@@ -33,6 +33,10 @@ data_path = Path("/heronas/simeone/COSI/crab_data")
 fetch_wasabi_file('COSI-SMEX/DC3/Data/Orientation/20280301_3_month_with_orbital_info.fits', output=str(data_path / '20280301_3_month_with_orbital_info.fits'), checksum = '5e69bc1d55fab9390f90635690f62896')
 sc_orientation = SpacecraftHistory.open(data_path / "20280301_3_month_with_orbital_info.fits")
 
+# Scarico la risposta del rilevatore
+dr_path = str(data_path / "ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5") # path to detector response
+fetch_wasabi_file('COSI-SMEX/DC4/Data/Responses/ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5',
+                       output=str(dr_path), checksum = '7121f094be50e7bfe9b31e53015b0e85')
 
 # Scarico i dati della Crab
 crab_data_path = data_path / "crab_standard_3months_binned_data_filtered_with_SAAcut.fits.gz.hdf5"
