@@ -76,4 +76,4 @@ for bckfile in bkg_dist.keys() :
 # Carico la risposta del rilevatore
 dr_path = str(data_path / "ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5") # path to detector response
 dr = FullDetectorResponse.open(dr_path)
-print(dr)
+
