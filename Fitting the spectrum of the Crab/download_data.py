@@ -1,3 +1,6 @@
+import logging
+logging.basicConfig(level=logging.INFO) # serve solo per avere le informazioni durante i caricamenti
+
 from cosipy import BinnedData
 from cosipy.spacecraftfile import SpacecraftHistory
 from cosipy.response.FullDetectorResponse import FullDetectorResponse
@@ -8,7 +11,6 @@ from cosipy.background_estimation import FreeNormBinnedBackground
 from cosipy.interfaces import ThreeMLPluginInterface
 from cosipy.response import BinnedThreeMLModelFolding, BinnedInstrumentResponse, BinnedThreeMLPointSourceResponse
 from cosipy.data_io import EmCDSBinnedData
-logging.basicConfig(level=logging.INFO) # serve solo per avere le informazioni durante i caricamenti
 
 import sys
 
