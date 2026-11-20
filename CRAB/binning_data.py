@@ -1,6 +1,6 @@
 import matplotlib
 import matplotlib.pyplot as plt
-from cosipy import BinnedData # Importo la classe BinnedData
+from cosipy import BinnedData # importo la classe BinnedData
 
 import logging
 
@@ -18,5 +18,5 @@ bkg_path = data_path / bkg_name_
 
 analysis = BinnedData(data_path / "crab.yaml") # indica a cosipy di caricare la lista di fotoni direttamente dal file HDF5
 # Suddivido i bin definiti in crab.yaml in 4 dimensioni.
-analysis.get_binned_data(unbinned_data=crab_path, output_name="crab_binned_data", make_binning_plots=True, show_plots=True)
-analysis.get_binned_data(unbinned_data=bkg_path , output_name="bkg_binned_data" , make_binning_plots=True, show_plots=True)
+analysis.get_binned_data(unbinned_data=crab_path, output_name=data_path / "crab_binned_data", make_binning_plots=False, show_plots=False)
+analysis.get_binned_data(unbinned_data=bkg_path , output_name=data_path / "bkg_binned_data" , make_binning_plots=False, show_plots=False)

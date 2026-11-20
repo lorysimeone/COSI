@@ -43,8 +43,8 @@ fetch_wasabi_file(f"COSI-SMEX/DC4/Data/Responses/{dr_name}",
                   checksum="7121f094be50e7bfe9b31e53015b0e85")
 
 # Download fondo non binnato
-# bkg_name = "Total_DC4_BG_3months_unbinned_data_filtered_with_SAAcut_withSAAbck.fits.gz"
-bkg_name = "Total_DC4_BG_3months_binned_data_filtered_with_SAAcut_withSAAbck.hdf5"
+bkg_name = "Total_DC4_BG_3months_unbinned_data_filtered_with_SAAcut_withSAAbck.fits.gz"
+#bkg_name = "Total_DC4_BG_3months_binned_data_filtered_with_SAAcut_withSAAbck.hdf5"
 bkg_path = data_path / bkg_name
 fetch_wasabi_file(f"COSI-SMEX/DC4/Data/Backgrounds/{bkg_name}", bkg_path)
 

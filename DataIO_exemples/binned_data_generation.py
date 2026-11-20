@@ -1,6 +1,6 @@
 import matplotlib
 import matplotlib.pyplot as plt
-from cosipy import BinnedData # Importo la classe BinnedData
+from cosipy import BinnedData # importo la classe BinnedData
 
 import logging
 logging.basicConfig(level=logging.INFO) # serve solo per avere le informazioni durante i caricamenti
