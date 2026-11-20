@@ -81,7 +81,7 @@ crab.load_binned_data_from_hdf5(binned_data=crab_data_path)
 single_bkg_fit = True
 bkg_data_path = data_path / "bkg_binned_data.hdf5"
 
-bkg_binned = BinnedData(data_path / "background.yaml")
+bkg_binned = BinnedData(data_path / "crab.yaml")
 bkg_binned.load_binned_data_from_hdf5(binned_data=bkg_data_path)
 
 total_bkg = bkg_binned.binned_data.project('Em', 'Phi', 'PsiChi')
