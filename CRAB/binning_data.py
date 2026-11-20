@@ -4,8 +4,6 @@ from cosipy import BinnedData # Importo la classe BinnedData
 
 import logging
 
-from CRAB.download import bkg_name
-
 logging.basicConfig(level=logging.INFO) # serve solo per avere le informazioni durante i caricamenti
 
 from pathlib import Path
