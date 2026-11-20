@@ -1,5 +1,10 @@
+import time
+
+t_start = time.perf_counter()
+
 import logging
-logging.basicConfig(level=logging.INFO) # serve solo per avere le informazioni durante i caricamenti
+
+logging.basicConfig(level=logging.INFO)  # serve solo per avere le informazioni durante i caricamenti
 
 from cosipy import BinnedData
 from cosipy.spacecraftfile import SpacecraftHistory
@@ -18,6 +23,7 @@ import astropy.units as u
 
 import numpy as np
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -43,7 +49,7 @@ bkg_components = {"PrimaryProtons":{'filename':'PrimaryProtons_WithDetCstbinned_
                   "SecondaryProtons": {'filename': 'SecondaryProtons_WithDetCstbinned_data_filtered_with_SAAcut.fits.gz.hdf5', 'checksum': '78aefa46707c98563294a898a62845c1'},
                   "SAAprotons": {'filename': 'SAA_3months_unbinned_data_filtered_with_SAAcut_statreduced_akaHEPD01result.hdf5', 'checksum': 'fc69fbbfd94cd595f57a8b11fc721169'},
                   }
-                  
+
 for bkg in bkg_components.values(): # carico e lavoro su ogni componente del fondo
     binned_data = BinnedData(data_path / "background.yaml")
     binned_data.load_binned_data_from_hdf5(binned_data=data_path/bkg['filename']) # carica il file di quella componente
@@ -92,7 +98,8 @@ for bckfile in bkg_dist.keys():
     bkg_dist[bckfile] += sys.float_info.min
 
 # Carico la risposta del rilevatore
-dr_path = str(data_path / "ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5")
+dr_path = str(
+    data_path / "ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5")
 dr = FullDetectorResponse.open(dr_path)
 
 # Incapsulo gli oggetti BinnedData nell'interfaccia appropriata
@@ -102,23 +109,23 @@ data = EmCDSBinnedData(crab.binned_data.project('Em', 'Phi', 'PsiChi') + total_b
 # Per questo fondo, sono liberi solo i parametri di normalizzazione
 bkg = FreeNormBinnedBackground(bkg_dist,
                                sc_history=sc_orientation,
-                               copy = False)
+                               copy=False)
 
 # Wrape the raw response with BinnedInstrumentResponseInterface implementation
 instrument_response = BinnedInstrumentResponse(dr, data)
 
 # Inizializzo la PSR di 3ML
-psr = BinnedThreeMLPointSourceResponse(data = data,
-                                       instrument_response = instrument_response,
+psr = BinnedThreeMLPointSourceResponse(data=data,
+                                       instrument_response=instrument_response,
                                        sc_history=sc_orientation,
-                                       energy_axis = dr.axes['Ei'],
-                                       polarization_axis = dr.axes['Pol'] if 'Pol' in dr.axes.labels else None,
-                                       nside = 2*data.axes['PsiChi'].nside)
+                                       energy_axis=dr.axes['Ei'],
+                                       polarization_axis=dr.axes['Pol'] if 'Pol' in dr.axes.labels else None,
+                                       nside=2 * data.axes['PsiChi'].nside)
 
 # Passo la PSR di 3ML alla funzione che esegue la convoluzione con lo spettro
-response = BinnedThreeMLModelFolding(data = data, point_source_response = psr)
+response = BinnedThreeMLModelFolding(data=data, point_source_response=psr)
 
-like_fun = PoissonLikelihood(data, response, bkg) # la likelihood da usare
+like_fun = PoissonLikelihood(data, response, bkg)  # la likelihood da usare
 
 # Creo il plugin di CPSI
 cosi = ThreeMLPluginInterface('cosi',
@@ -128,12 +135,12 @@ cosi = ThreeMLPluginInterface('cosi',
 # Creo i parametri del fondo, ovvero le ambpiezze per ogni bin
 for bkg_label in bkg_dist.keys():
     cosi.bkg_parameter[bkg_label] = Parameter(bkg_label,  # parametro del fondo
-                                      1,  # valore iniziale del parametro
-                                      min_value=0,  # valore minimo del parametro
-                                      max_value= 100 if single_bkg_fit else 20,  # valore massimo del parametro
-                                      delta=0.05,  # passo iniziale usato dal minimizzatore
-                                      unit = u.Hz # unità: conteggi al secondo
-                                      )
+                                              1,  # valore iniziale del parametro
+                                              min_value=0,  # valore minimo del parametro
+                                              max_value=100 if single_bkg_fit else 20,  # valore massimo del parametro
+                                              delta=0.05,  # passo iniziale usato dal minimizzatore
+                                              unit=u.Hz  # unità: conteggi al secondo
+                                              )
 
 # Definisco il modello di sorgente puntiforme
 l = 184.56
@@ -166,20 +173,20 @@ spectrum.xp.unit = xp.unit
 spectrum.K.unit = K.unit
 spectrum.piv.unit = piv.unit
 
-source = PointSource("source",                     # nome della sorgente (arbitrario, ma deve essere univoco)
-                     l = l,                        # Longitude (deg)
-                     b = b,                        # Latitude (deg)
-                     spectral_shape = spectrum)    # Spectral model
+source = PointSource("source",  # nome della sorgente (arbitrario, ma deve essere univoco)
+                     l=l,  # Longitude (deg)
+                     b=b,  # Latitude (deg)
+                     spectral_shape=spectrum)  # Spectral model
 
 # Opzionale: rendo liberi i parametri della posizione
-#source.position.l.free = True
-#source.position.b.free = True
+# source.position.l.free = True
+# source.position.b.free = True
 
 model = Model(source)  # Modello a unica sorgente (altrimenti è Model(source1, source2, ...))
 
-plugins = DataList(cosi) # raccoglie il dataset da usare nel fit
+plugins = DataList(cosi)  # raccoglie il dataset da usare nel fit
 
-like = JointLikelihood(model, plugins, verbose = False) # calcola la verosomiglianza
+like = JointLikelihood(model, plugins, verbose=False)  # calcola la verosomiglianza
 
 results, like_df = like.fit()
 print(results)
@@ -217,7 +224,7 @@ results = like.results
 
 print(results.display())
 
-parameters = {par.name:results.get_variates(par.path)
+parameters = {par.name: results.get_variates(par.path)
               for par in results.optimized_model["source"].parameters.values()
               if par.free}
 
@@ -226,7 +233,7 @@ results_err = results.propagate(results.optimized_model["source"].spectrum.main.
 print(results.optimized_model["source"])
 
 # Definisco il flusso e gli errori nei range utilizzati per il fit e nei dati immessi
-energy = np.geomspace(100*u.keV,10*u.MeV).to_value(u.keV)
+energy = np.geomspace(100 * u.keV, 10 * u.MeV).to_value(u.keV)
 
 flux_lo = np.zeros_like(energy)
 flux_median = np.zeros_like(energy)
@@ -243,18 +250,18 @@ binned_energy_edges = crab.binned_data.axes['Em'].edges.value
 binned_energy = np.array([])
 bin_sizes = np.array([])
 
-for i in range(len(binned_energy_edges)-1):
-    binned_energy = np.append(binned_energy, (binned_energy_edges[i+1] + binned_energy_edges[i]) / 2)
-    bin_sizes = np.append(bin_sizes, binned_energy_edges[i+1] - binned_energy_edges[i])
+for i in range(len(binned_energy_edges) - 1):
+    binned_energy = np.append(binned_energy, (binned_energy_edges[i + 1] + binned_energy_edges[i]) / 2)
+    bin_sizes = np.append(bin_sizes, binned_energy_edges[i + 1] - binned_energy_edges[i])
 
 expectation = response.expectation()
 
 # Plotto lo spettro immesso e lo spettro fittato
-fig,ax = plt.subplots()
+fig, ax = plt.subplots()
 
-ax.plot(energy, energy*energy*flux_median, label = "Best fit")
-ax.fill_between(energy, energy*energy*flux_lo, energy*energy*flux_hi, alpha = .5, label = "Best fit (errors)")
-ax.plot(energy, energy*energy*flux_inj, color = 'black', ls = ":", label = "Injected")
+ax.plot(energy, energy * energy * flux_median, label="Best fit")
+ax.fill_between(energy, energy * energy * flux_lo, energy * energy * flux_hi, alpha=.5, label="Best fit (errors)")
+ax.plot(energy, energy * energy * flux_inj, color='black', ls=":", label="Injected")
 
 ax.set_xscale("log")
 ax.set_yscale("log")
@@ -262,7 +269,7 @@ ax.set_yscale("log")
 ax.set_xlabel("Energy (keV)")
 ax.set_ylabel(r"$E^2 \frac{dN}{dE}$ (keV cm$^{-2}$ s$^{-1}$)")
 
-ax.set_ylim(.1,100)
+ax.set_ylim(.1, 100)
 
 _ = ax.legend()
 
@@ -270,12 +277,18 @@ ax.figure.savefig("injected_vs_fit.png", dpi=200, bbox_inches="tight")
 
 # Plotto lo spettro convoluto con la risposta e lo spettro fittato
 
-fig,ax = plt.subplots()
+fig, ax = plt.subplots()
 
-ax.stairs(expectation.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='purple', label = "Best fit convolved with response")
-ax.errorbar(binned_energy, expectation.project('Em').to_dense(copy=False).contents, yerr=np.sqrt(expectation.project('Em').to_dense(copy=False).contents), color='purple', linewidth=0, elinewidth=1)
-ax.stairs(crab.binned_data.project('Em').to_dense(copy=False).contents, binned_energy_edges, color = 'black', ls = ":", label = "Source counts")
-ax.errorbar(binned_energy, crab.binned_data.project('Em').to_dense(copy=False).contents, yerr=np.sqrt(crab.binned_data.project('Em').to_dense(copy=False).contents), color='black', linewidth=0, elinewidth=1)
+ax.stairs(expectation.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='purple',
+          label="Best fit convolved with response")
+ax.errorbar(binned_energy, expectation.project('Em').to_dense(copy=False).contents,
+            yerr=np.sqrt(expectation.project('Em').to_dense(copy=False).contents), color='purple', linewidth=0,
+            elinewidth=1)
+ax.stairs(crab.binned_data.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='black', ls=":",
+          label="Source counts")
+ax.errorbar(binned_energy, crab.binned_data.project('Em').to_dense(copy=False).contents,
+            yerr=np.sqrt(crab.binned_data.project('Em').to_dense(copy=False).contents), color='black', linewidth=0,
+            elinewidth=1)
 
 ax.set_xscale("log")
 ax.set_yscale("log")
@@ -288,14 +301,22 @@ _ = ax.legend()
 ax.figure.savefig("convolved_spectrum_vs_fit.png", dpi=200, bbox_inches="tight")
 
 # Aggiungo il fondo
-expectation_bkg = bkg.expectation(copy = True)
+expectation_bkg = bkg.expectation(copy=True)
 
-fig,ax = plt.subplots()
+fig, ax = plt.subplots()
 
-ax.stairs(expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='purple', label = "Best fit convolved with response plus background")
-ax.errorbar(binned_energy, expectation.project('Em').to_dense(copy=False).contents+expectation_bkg.project('Em').to_dense(copy=False).contents, yerr=np.sqrt(expectation.project('Em').to_dense(copy=False).contents+expectation_bkg.project('Em').to_dense(copy=False).contents), color='purple', linewidth=0, elinewidth=1)
-ax.stairs(data.data.project('Em').to_dense(copy=False).contents, binned_energy_edges, color = 'black', ls = ":", label = "Total counts")
-ax.errorbar(binned_energy, data.data.project('Em').to_dense(copy=False).contents, yerr=np.sqrt(data.data.project('Em').to_dense(copy=False).contents), color='black', linewidth=0, elinewidth=1)
+ax.stairs(expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(
+    copy=False).contents, binned_energy_edges, color='purple', label="Best fit convolved with response plus background")
+ax.errorbar(binned_energy,
+            expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(
+                copy=False).contents, yerr=np.sqrt(
+        expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(
+            copy=False).contents), color='purple', linewidth=0, elinewidth=1)
+ax.stairs(data.data.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='black', ls=":",
+          label="Total counts")
+ax.errorbar(binned_energy, data.data.project('Em').to_dense(copy=False).contents,
+            yerr=np.sqrt(data.data.project('Em').to_dense(copy=False).contents), color='black', linewidth=0,
+            elinewidth=1)
 
 ax.set_xscale("log")
 ax.set_yscale("log")
@@ -308,3 +329,8 @@ ax.legend()
 plt.show()
 
 ax.figure.savefig("convolved_spectrum_vs_fit_with_background.png", dpi=200, bbox_inches="tight")
+
+t_end = time.perf_counter()
+elapsed = t_end - t_start
+minutes, seconds = divmod(elapsed, 60)
+print(f"Tempo totale di esecuzione: {int(minutes)}m {seconds:.2f}s ({elapsed:.2f}s)")
