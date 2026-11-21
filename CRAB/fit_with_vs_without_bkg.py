@@ -266,3 +266,40 @@ ax.set_axisbelow(True)
 ax.legend(frameon=False, loc="upper right", fontsize=10.5, handlelength=2.2)
 
 fig.savefig("injected_vs_fit.png", dpi=200, bbox_inches="tight")
+
+import json
+
+def spectrum_params(spec_or_shape):
+    """Valore, unità e flag 'free' di ogni parametro dello spettro Band."""
+    return {name: {"value": float(p.value), "unit": str(p.unit), "free": bool(p.free)}
+            for name, p in spec_or_shape.parameters.items()}
+
+def fit_summary(results):
+    """Parametri del best fit con errori e matrice di covarianza."""
+    shape = results.optimized_model["source"].spectrum.main.shape
+    out = spectrum_params(shape)
+    df = results.get_data_frame()
+    for idx in df.index:
+        name = idx.split(".")[-1]
+        if name in out:
+            out[name]["error"] = float(df.loc[idx, "error"])
+            out[name]["neg_error"] = float(df.loc[idx, "negative_error"])
+            out[name]["pos_error"] = float(df.loc[idx, "positive_error"])
+    return {
+        "parameters": out,
+        "free_parameters_order": [i.split(".")[-1] for i in df.index],
+        "covariance_matrix": np.asarray(results.covariance_matrix).tolist(),
+    }
+
+def band_dict(med, lo, hi):
+    return {"median": med.tolist(), "lo_68": lo.tolist(), "hi_68": hi.tolist()}
+
+output = {
+    "energy_keV": energy.tolist(),
+    "injected": spectrum_params(spectrum_inj),
+    "fit_source_plus_background": {**fit_summary(res_sb), "band": band_dict(med_sb, lo_sb, hi_sb)},
+    "fit_source_only": {**fit_summary(res_so), "band": band_dict(med_so, lo_so, hi_so)},
+}
+
+with open("spectra_parameters.json", "w") as f:
+    json.dump(output, f, indent=2)
