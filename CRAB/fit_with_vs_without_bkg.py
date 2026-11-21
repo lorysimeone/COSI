@@ -238,11 +238,11 @@ fig, ax = plt.subplots(figsize=(6.5, 4.8))
 e2 = energy ** 2
 ax.plot(energy, e2 * flux_inj, color="black", ls="--", lw=1.5, label="Injected (.dat)")
 
-ax.plot(energy, e2 * med_sb, color=C_SB, lw=2.5,
+ax.plot(energy, e2 * med_sb, color=C_SB, lw=.5,
         label="Source + background  (band: statistical 1σ)")
 ax.fill_between(energy, e2 * lo_sb, e2 * hi_sb, color=C_SB, alpha=0.4, lw=0)
 
-ax.plot(energy, e2 * med_so, color=C_SO, lw=2.5,
+ax.plot(energy, e2 * med_so, color=C_SO, lw=.5,
         label="Source only  (band: statistical 1σ)")
 ax.fill_between(energy, e2 * lo_so, e2 * hi_so, color=C_SO, alpha=0.4, lw=0)
 
