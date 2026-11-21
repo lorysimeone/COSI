@@ -306,14 +306,14 @@ expectation_bkg = bkg.expectation(copy=True)
 fig, ax = plt.subplots()
 
 ax.stairs(expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(
-    copy=False).contents, binned_energy_edges, color='purple', label="Best fit convolved with response plus background")
+            copy=False).contents, binned_energy_edges, color='purple', label="Best fit convolved with response plus background")
 ax.errorbar(binned_energy,
             expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(
-                copy=False).contents, yerr=np.sqrt(
-        expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(
+            copy=False).contents, yerr=np.sqrt(
+            expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(
             copy=False).contents), color='purple', linewidth=0, elinewidth=1)
 ax.stairs(data.data.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='black', ls=":",
-          label="Total counts")
+            label="Total counts")
 ax.errorbar(binned_energy, data.data.project('Em').to_dense(copy=False).contents,
             yerr=np.sqrt(data.data.project('Em').to_dense(copy=False).contents), color='black', linewidth=0,
             elinewidth=1)
