@@ -102,6 +102,47 @@ dr_path = str(
     data_path / "ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5")
 dr = FullDetectorResponse.open(dr_path)
 
+# ------------------------------------------------------------------
+# Parametri della sorgente (fit)
+# ------------------------------------------------------------------
+l = 184.56
+b = -5.78
+
+alpha = -1.99
+beta = -2.32
+E0 = 531. * (alpha - beta) * u.keV
+xp = E0 * (alpha + 2) / (alpha - beta)
+piv = 500. * u.keV
+K = 3.07e-5 / u.cm / u.cm / u.s / u.keV
+
+# ------------------------------------------------------------------
+# Spettro iniettato nella simulazione (solo per il plot)
+# ------------------------------------------------------------------
+alpha_inj = -1.99
+beta_inj = -2.32
+E0_inj = 531. * (alpha_inj - beta_inj) * u.keV
+xp_inj = E0_inj * (alpha_inj + 2) / (alpha_inj - beta_inj)
+piv_inj = 100. * u.keV
+K_inj = 7.56e-4 / u.cm / u.cm / u.s / u.keV
+
+spectrum_inj = Band()
+
+spectrum_inj.alpha.min_value = -2.14
+spectrum_inj.alpha.max_value = 3.0
+spectrum_inj.beta.min_value = -5.0
+spectrum_inj.beta.max_value = -2.15
+spectrum_inj.xp.min_value = 1.0
+
+spectrum_inj.alpha.value = alpha_inj
+spectrum_inj.beta.value = beta_inj
+spectrum_inj.xp.value = xp_inj.value
+spectrum_inj.K.value = K_inj.value
+spectrum_inj.piv.value = piv_inj.value
+
+spectrum_inj.xp.unit = xp_inj.unit
+spectrum_inj.K.unit = K_inj.unit
+spectrum_inj.piv.unit = piv_inj.unit
+
 from matplotlib.lines import Line2D
 
 # ------------------------------------------------------------------
