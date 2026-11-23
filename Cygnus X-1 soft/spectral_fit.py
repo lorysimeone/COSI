@@ -7,7 +7,7 @@ import pickle
 
 import logging
 
-logging.basicConfig(level=logging.INFO)  # serve solo per avere le informazioni durante i caricamenti
+logging.basicConfig(level=logging.INFO)  # attivo i log informativi durante i caricamenti
 
 from cosipy import BinnedData
 from cosipy.spacecraftfile import SpacecraftHistory
@@ -19,8 +19,6 @@ from cosipy.background_estimation import FreeNormBinnedBackground
 from cosipy.interfaces import ThreeMLPluginInterface
 from cosipy.response import BinnedThreeMLModelFolding, BinnedInstrumentResponse, BinnedThreeMLPointSourceResponse
 from cosipy.data_io import EmCDSBinnedData
-
-import sys
 
 import astropy.units as u
 
@@ -42,7 +40,6 @@ def prepare_cosi_plugin(
     source_data_path: Path,
     bkg_data_path: Path,
     dr_path: Path,
-    psr_cache_path: Path = Path("psr_cache.pkl"),
 ):
     # Carico il file di orientazione
     sc_orientation = SpacecraftHistory.open(sc_orientation_path)
@@ -78,22 +75,13 @@ def prepare_cosi_plugin(
     # Wrape the raw response with BinnedInstrumentResponseInterface implementation
     instrument_response = BinnedInstrumentResponse(dr, data)
 
-    # Controllo se esiste già il file con la PSR salvata per evitare di ricrearla
-    if psr_cache_path.exists():
-        # Leggo la PSR già salvata su file e salto la creazione da zero
-        with open(psr_cache_path, "rb") as f:
-            psr = pickle.load(f)
-    else:
-        # Inizializzo la PSR di 3ML
-        psr = BinnedThreeMLPointSourceResponse(data=data,
-                                               instrument_response=instrument_response,
-                                               sc_history=sc_orientation,
-                                               energy_axis=dr.axes['Ei'],
-                                               polarization_axis=dr.axes['Pol'] if 'Pol' in dr.axes.labels else None,
-                                               nside=2 * data.axes['PsiChi'].nside)
-        # Salvo la PSR creata su file per i calcoli successivi
-        with open(psr_cache_path, "wb") as f:
-            pickle.dump(psr, f)
+    # Inizializzo la PSR di 3ML
+    psr = BinnedThreeMLPointSourceResponse(data=data,
+                                           instrument_response=instrument_response,
+                                           sc_history=sc_orientation,
+                                           energy_axis=dr.axes['Ei'],
+                                           polarization_axis=dr.axes['Pol'] if 'Pol' in dr.axes.labels else None,
+                                           nside=2 * data.axes['PsiChi'].nside)
 
     # Passo la PSR di 3ML alla funzione che esegue la convoluzione con lo spettro
     response = BinnedThreeMLModelFolding(data=data, point_source_response=psr)
@@ -204,42 +192,7 @@ for i, e in enumerate(energy):
     flux_median[i] = flux.median
     flux_lo[i], flux_hi[i] = flux.equal_tail_interval(cl=0.68)
 
-# Plotto lo spettro fittato (con la sua banda d'errore al 68%)
-fig, ax = plt.subplots()  # creo una nuova figura per il plot dello spettro fittato
-
-spec_opt = results.optimized_model["source"].spectrum.main.shape  # recupero il modello spettrale ottimizzato
-k_val = spec_opt.K.value  # estraggo il valore fittato di K
-idx_val = spec_opt.index.value  # estraggo il valore fittato dell'indice spettrale
-piv_val = spec_opt.piv.value  # estraggo il valore dell'energia di pivot
-
-k_err = results.get_variates(spec_opt.K.path).std  # calcolo l'incertezza su K dai variates del fit
-idx_err = results.get_variates(spec_opt.index.path).std  # calcolo l'incertezza sull'indice spettrale dai variates del fit
-
-fit_label = (  # preparo l'etichetta della legenda con i parametri del fit
-    f"Best fit\n"
-    f"K = {k_val:.2e} ± {k_err:.2e} (at {piv_val:g} keV)\n"
-    f"index = {idx_val:.2f} ± {idx_err:.2f}"
-)
-
-ax.plot(energy, energy * energy * flux_median, label=fit_label)  # traccio la mediana dello spettro fittato includendo i parametri in legenda
-ax.fill_between(energy, energy * energy * flux_lo, energy * energy * flux_hi, alpha=.5, label="Best fit (errors)")  # ombreggio l'intervallo al 68%
-
-ax.set_xscale("log")  # imposto la scala logaritmica sull'asse delle energie
-ax.set_yscale("log")  # imposto la scala logaritmica sull'asse del flusso
-
-ax.set_xlabel("Energy (keV)")  # etichetta dell'asse x
-ax.set_ylabel(r"$E^2 \frac{dN}{dE}$ (keV cm$^{-2}$ s$^{-1}$)")  # etichetta dell'asse y
-
-ax.set_ylim(.1, 100)  # imposto i limiti verticali del plot
-
-_ = ax.legend()  # mostro la legenda aggiornata con i parametri
-
-output_dir = Path("spectra_figures")  # definisco il percorso della cartella di destinazione per le figure
-output_dir.mkdir(parents=True, exist_ok=True)  # creo la cartella e le eventuali cartelle intermedie se non esistono già
-ax.figure.savefig(output_dir / "fitted_spectrum_power_law.png", dpi=200, bbox_inches="tight")  # salvo il plot dello spettro fittato dentro la cartella
-plt.close(fig)  # chiudo la figura per liberare memoria
-
-# Plotto lo spettro fittato (con la sua banda d'errore al 68%)
+# Plotto lo spettro fittato (con la sua banda d'errore al 68%) e i punti del file .dat
 fig, ax = plt.subplots()  # creo una nuova figura per il plot dello spettro fittato
 
 dat_file_path = data_path_cygnus_soft / "cygX1_soft_spec.dat"  # definisco il percorso del file .dat dello spettro
@@ -284,6 +237,11 @@ ax.set_ylabel(r"$E^2 \frac{dN}{dE}$ (keV cm$^{-2}$ s$^{-1}$)")  # etichetta dell
 ax.set_ylim(.1, 100)  # imposto i limiti verticali del plot
 
 _ = ax.legend()  # mostro la legenda aggiornata con i parametri e i punti del file .dat
+
+output_dir = Path("spectra_figures")  # definisco il percorso della cartella di destinazione per le figure
+output_dir.mkdir(parents=True, exist_ok=True)  # creo la cartella e le eventuali cartelle intermedie se non esistono già
+ax.figure.savefig(output_dir / "fitted_spectrum_power_law.png", dpi=200, bbox_inches="tight")  # salvo il plot dello spettro fittato dentro la cartella
+plt.close(fig)  # chiudo la figura per liberare memoria
 
 t_end = time.perf_counter()
 elapsed = t_end - t_start
