@@ -32,7 +32,7 @@ data_path = Path("/heronas/simeone/COSI/Cygnus X-1 soft")
 # Download
 name = "cygX1_soft_3months_unbinned_data_filtered_with_SAAcut.fits.gz"
 path = data_path / name
-fetch_wasabi_file(f"COSI-SMEX/DC4/Data/Sources/{name}", path)
+fetch_wasabi_file(f"COSI-SMEX/DC3/Data/Sources/{name}", path)
 
 # Binning
 analysis = BinnedData("/heronas/simeone/COSI/ori_bkg_yaml/crab.yaml")
