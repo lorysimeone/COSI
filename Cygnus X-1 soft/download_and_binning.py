@@ -36,4 +36,4 @@ fetch_wasabi_file(f"COSI-SMEX/DC3/Data/Sources/{name}", path)
 
 # Binning
 analysis = BinnedData("/heronas/simeone/COSI/ori_bkg_yaml/DC4.yaml")
-analysis.get_binned_data(unbinned_data=path, output_name=path / "cygnus_soft_binned_data", make_binning_plots=False, show_plots=False)
+analysis.get_binned_data(unbinned_data=path, output_name=data_path / "cygnus_soft_binned_data", make_binning_plots=False, show_plots=False)
