@@ -194,7 +194,21 @@ for i, e in enumerate(energy):
 # Plotto lo spettro fittato (con la sua banda d'errore al 68%)
 fig, ax = plt.subplots()  # creo una nuova figura per il plot dello spettro fittato
 
-ax.plot(energy, energy * energy * flux_median, label="Best fit")  # traccio la mediana dello spettro fittato
+spec_opt = results.optimized_model["source"].spectrum.main.shape  # recupero il modello spettrale ottimizzato
+k_val = spec_opt.K.value  # estraggo il valore fittato di K
+idx_val = spec_opt.index.value  # estraggo il valore fittato dell'indice spettrale
+piv_val = spec_opt.piv.value  # estraggo il valore dell'energia di pivot
+
+k_err = results.get_variates(spec_opt.K.path).std  # calcolo l'incertezza su K dai variates del fit
+idx_err = results.get_variates(spec_opt.index.path).std  # calcolo l'incertezza sull'indice spettrale dai variates del fit
+
+fit_label = (  # preparo l'etichetta della legenda con i parametri del fit
+    f"Best fit\n"
+    f"K = {k_val:.2e} ± {k_err:.2e} (at {piv_val:g} keV)\n"
+    f"index = {idx_val:.2f} ± {idx_err:.2f}"
+)
+
+ax.plot(energy, energy * energy * flux_median, label=fit_label)  # traccio la mediana dello spettro fittato includendo i parametri in legenda
 ax.fill_between(energy, energy * energy * flux_lo, energy * energy * flux_hi, alpha=.5, label="Best fit (errors)")  # ombreggio l'intervallo al 68%
 
 ax.set_xscale("log")  # imposto la scala logaritmica sull'asse delle energie
@@ -205,7 +219,7 @@ ax.set_ylabel(r"$E^2 \frac{dN}{dE}$ (keV cm$^{-2}$ s$^{-1}$)")  # etichetta dell
 
 ax.set_ylim(.1, 100)  # imposto i limiti verticali del plot
 
-_ = ax.legend()  # mostro la legenda
+_ = ax.legend()  # mostro la legenda aggiornata con i parametri
 
 output_dir = Path("spectra_figures")  # definisco il percorso della cartella di destinazione per le figure
 output_dir.mkdir(parents=True, exist_ok=True)  # creo la cartella e le eventuali cartelle intermedie se non esistono già
