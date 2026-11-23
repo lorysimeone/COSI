@@ -195,7 +195,7 @@ for i, e in enumerate(energy):
 # Plotto lo spettro fittato (con la sua banda d'errore al 68%) e i punti del file .dat
 fig, ax = plt.subplots()  # creo una nuova figura per il plot dello spettro fittato
 
-dat_file_path = data_path_cygnus_soft / "cygX1_soft_spec.dat"  # definisco il percorso del file .dat dello spettro
+dat_file_path = data_path_cygnus_soft / "model/cygX1_soft_spec.dat"  # definisco il percorso del file .dat dello spettro
 dat_energies = []  # preparo la lista per le energie lette dal file .dat
 dat_fluxes = []  # preparo la lista per i flussi differenziali letti dal file .dat
 
