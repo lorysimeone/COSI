@@ -3,6 +3,15 @@ import time
 t_start = time.perf_counter()
 
 import sys
+from pathlib import Path
+
+cartella_modello = Path("/heronas/simeone/COSI/Cygnus X-1 soft/model")  # imposto il percorso della cartella che contiene modello_spettrale.py
+if str(cartella_modello) not in sys.path:  # verifico che il percorso non sia già presente in sys.path
+    sys.path.insert(0, str(cartella_modello))  # aggiungo la cartella all'inizio del percorso di ricerca dei moduli
+
+from modello_spettrale import crea_modello_spettrale
+
+import sys
 import pickle
 
 import logging
@@ -86,6 +95,34 @@ def prepare_cosi_plugin(
     # Passo la PSR di 3ML alla funzione che esegue la convoluzione con lo spettro
     response = BinnedThreeMLModelFolding(data=data, point_source_response=psr)
 
+    import inspect
+    import pickle
+
+    # Controllo la classe esatta e la gerarchia di ereditarietà di response
+    print("Tipo:", type(response))
+    print("MRO:", [cls.__name__ for cls in type(response).__mro__])
+
+    # Controllo attributi e metodi pubblici
+    public_attrs = [name for name in dir(response) if not name.startswith("_")]
+    print("Attributi/metodi pubblici:", public_attrs)
+
+    # Ispeziono la firma del costruttore e del metodo __init__
+    print("Signature __init__:", inspect.signature(type(response).__init__))
+
+    # Provo a verificare se response supporta la serializzazione con pickle
+    test_file = Path("test_response.pkl")
+    try:
+        with open(test_file, "wb") as f:
+            pickle.dump(response, f)
+        with open(test_file, "rb") as f:
+            reloaded = pickle.load(f)
+        print("Pickle riuscito! Tipo ricaricato:", type(reloaded))
+    except Exception as e:
+        print("Pickle non riuscito o problematico:", type(e).__name__, e)
+    finally:
+        if test_file.exists():
+            test_file.unlink()
+
     like_fun = PoissonLikelihood(data, response, bkg)  # la likelihood da usare
 
     # Creo il plugin di COSI
@@ -128,35 +165,7 @@ print(f"prepare_cosi_plugin: {time.perf_counter()-t0:.1f}s")
 l = 184.56
 b = -5.78
 
-index = -2.0
-piv = 100.0 * u.keV
-K = 8.6e-5 / u.cm / u.cm / u.s / u.keV
-
-spectrum = Powerlaw()  # creo il modello spettrale a legge di potenza singola
-
-spectrum.index.min_value = -6.0  # imposto il limite inferiore per l'indice spettrale
-spectrum.index.max_value = 2.0  # imposto il limite superiore per l'indice spettrale
-spectrum.index.delta = 0.05  # imposto il passo iniziale per l'indice spettrale
-
-spectrum.K.value = K.value  # imposto il valore iniziale della normalizzazione
-spectrum.piv.value = piv.value  # imposto l'energia di pivot iniziale
-spectrum.index.value = index  # imposto l'indice spettrale iniziale
-
-spectrum.K.unit = K.unit  # assegno l'unità di misura alla normalizzazione
-spectrum.piv.unit = piv.unit  # assegno l'unità di misura all'energia di pivot
-
-spectrum.K.free = True  # lascio libera la normalizzazione durante il fit
-spectrum.index.free = True  # lascio libero l'indice spettrale durante il fit
-spectrum.piv.free = False  # tengo fissa l'energia di pivot
-
-source = PointSource("source",  # nome della sorgente (arbitrario, ma deve essere univoco)
-                     l=l,  # Longitude (deg)
-                     b=b,  # Latitude (deg)
-                     spectral_shape=spectrum)  # Spectral model
-
-# Opzionale: rendo liberi i parametri della posizione
-# source.position.l.free = True
-# source.position.b.free = True
+spectrum = crea_modello_spettrale()
 
 model = Model(source)  # Modello a unica sorgente (altrimenti è Model(source1, source2, ...))
 
