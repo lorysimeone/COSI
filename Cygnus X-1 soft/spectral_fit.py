@@ -2,14 +2,14 @@ import time
 
 t_start = time.perf_counter()
 
-import sys
+import importlib.util
 from pathlib import Path
 
-cartella_modello = Path("/heronas/simeone/COSI/Cygnus X-1 soft/model")  # imposto il percorso della cartella che contiene modello_spettrale.py
-if str(cartella_modello) not in sys.path:  # verifico che il percorso non sia già presente in sys.path
-    sys.path.insert(0, str(cartella_modello))  # aggiungo la cartella all'inizio del percorso di ricerca dei moduli
-
-from modello_spettrale import crea_modello_spettrale
+percorso_modello = Path("/heronas/simeone/COSI/Cygnus X-1 soft/model/modello_spettrale.py")  # definisco il percorso completo del file modello_spettrale.py
+spec = importlib.util.spec_from_file_location("modello_spettrale", percorso_modello)  # creo la specifica per caricare il modulo direttamente dal file
+modulo_spettrale = importlib.util.module_from_spec(spec)  # istanzio il nuovo modulo a partire dalla specifica
+spec.loader.exec_module(modulo_spettrale)  # eseguo il file per popolare il modulo
+crea_modello_spettrale = modulo_spettrale.crea_modello_spettrale  # recupero la funzione crea_modello_spettrale dal modulo caricato
 
 import sys
 import pickle
