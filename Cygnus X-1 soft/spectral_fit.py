@@ -88,12 +88,12 @@ def prepare_cosi_plugin(
 
     like_fun = PoissonLikelihood(data, response, bkg)  # la likelihood da usare
 
-    # Creo il plugin di CPSI
+    # Creo il plugin di COSI
     cosi = ThreeMLPluginInterface('cosi',
                                   like_fun,
                                   response,
                                   bkg)
-    # Creo i parametri del fondo, ovvero le ambpiezze per ogni bin
+    # Creo i parametri del fondo, ovvero le ampiezze per ogni bin
     for bkg_label in bkg_dist.keys():
         cosi.bkg_parameter[bkg_label] = Parameter(bkg_label,  # parametro del fondo
                                                   1,  # valore iniziale del parametro
@@ -115,12 +115,18 @@ source_data_path = data_path_cygnus_soft / "cygnus_soft_binned_data.hdf5"
 bkg_data_path = data_path_ori_bkg / "bkg_binned_data.hdf5"
 dr_path = data_path_ori_bkg / "ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5"
 
+t0 = time.perf_counter()
 cosi, response, bkg, source, data = prepare_cosi_plugin(
     sc_orientation_path= sc_orientation_path,
     yaml_path = yaml_path,
     source_data_path = source_data_path,
     bkg_data_path = bkg_data_path,
     dr_path = dr_path)
+print(f"prepare_cosi_plugin: {time.perf_counter()-t0:.1f}s")
+
+t0 = time.perf_counter()
+results, like_df = like.fit()
+print(f"fit: {time.perf_counter()-t0:.1f}s")
 
 # Definisco il modello di sorgente puntiforme con legge di potenza singola
 l = 184.56
@@ -209,7 +215,7 @@ with open(dat_file_path, "r") as f:  # apro il file .dat in lettura
 dat_energies = np.array(dat_energies)  # converto le energie in un array NumPy
 dat_fluxes = np.array(dat_fluxes)  # converto i flussi in un array NumPy
 
-ax.scatter(dat_energies, dat_energies * dat_energies * dat_fluxes, color="black", s=16, zorder=4, label="cygX1_soft_spec.dat")  # aggiungo lo scatter plot dei punti del file .dat in scala E^2 dN/dE
+ax.scatter(dat_energies, dat_energies * dat_energies * dat_fluxes, color="black", s=6, zorder=4, label="cygX1_soft_spec.dat")  # aggiungo lo scatter plot dei punti del file .dat in scala E^2 dN/dE
 
 spec_opt = results.optimized_model["source"].spectrum.main.shape  # recupero il modello spettrale ottimizzato
 k_val = spec_opt.K.value  # estraggo il valore fittato di K
