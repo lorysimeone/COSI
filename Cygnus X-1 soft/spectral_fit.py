@@ -124,10 +124,6 @@ cosi, response, bkg, source, data = prepare_cosi_plugin(
     dr_path = dr_path)
 print(f"prepare_cosi_plugin: {time.perf_counter()-t0:.1f}s")
 
-t0 = time.perf_counter()
-results, like_df = like.fit()
-print(f"fit: {time.perf_counter()-t0:.1f}s")
-
 # Definisco il modello di sorgente puntiforme con legge di potenza singola
 l = 184.56
 b = -5.78
@@ -167,8 +163,11 @@ model = Model(source)  # Modello a unica sorgente (altrimenti è Model(source1, 
 plugins = DataList(cosi)  # raccoglie il dataset da usare nel fit
 
 like = JointLikelihood(model, plugins, verbose=False)  # calcola la verosomiglianza
+like = JointLikelihood(model, plugins, verbose=False)  # calcola la verosomiglianza
 
+t0 = time.perf_counter()
 results, like_df = like.fit()
+print(f"fit: {time.perf_counter()-t0:.1f}s")
 print(results)
 print(like_df)
 
