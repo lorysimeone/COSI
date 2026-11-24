@@ -167,6 +167,10 @@ b = -5.78
 
 spectrum = crea_modello_spettrale()
 
+source = PointSource("source",  # nome della sorgente (arbitrario, ma deve essere univoco)
+                     l=l,  # Longitude (deg)
+                     b=b,  # Latitude (deg)
+                     spectral_shape=spectrum)  # Spectral model
 model = Model(source)  # Modello a unica sorgente (altrimenti è Model(source1, source2, ...))
 
 plugins = DataList(cosi)  # raccoglie il dataset da usare nel fit
