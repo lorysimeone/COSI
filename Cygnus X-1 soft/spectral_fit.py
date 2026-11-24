@@ -109,7 +109,7 @@ def prepare_cosi_plugin(
     # Ispeziono la firma del costruttore e del metodo __init__
     print("Signature __init__:", inspect.signature(type(response).__init__))
 
-    # Provo a verificare se response supporta la serializzazione con pickle
+    '''# Provo a verificare se response supporta la serializzazione con pickle
     test_file = Path("test_response.pkl")
     try:
         with open(test_file, "wb") as f:
@@ -121,7 +121,7 @@ def prepare_cosi_plugin(
         print("Pickle non riuscito o problematico:", type(e).__name__, e)
     finally:
         if test_file.exists():
-            test_file.unlink()
+            test_file.unlink()'''
 
     like_fun = PoissonLikelihood(data, response, bkg)  # la likelihood da usare
 
@@ -161,7 +161,7 @@ cosi, response, bkg, source, data = prepare_cosi_plugin(
     dr_path = dr_path)
 print(f"prepare_cosi_plugin: {time.perf_counter()-t0:.1f}s")
 
-# Definisco il modello di sorgente puntiforme con legge di potenza singola
+# Definisco il modello di sorgente puntiforme
 l = 184.56
 b = -5.78
 
@@ -261,7 +261,74 @@ output_dir.mkdir(parents=True, exist_ok=True)  # creo la cartella e le eventuali
 ax.figure.savefig(output_dir / "fitted_spectrum_power_law.png", dpi=200, bbox_inches="tight")  # salvo il plot dello spettro fittato dentro la cartella
 plt.close(fig)  # chiudo la figura per liberare memoria
 
+# Plotto lo spettro convoluto con la risposta e lo spettro fittato
+
+binned_data_source = BinnedData(yaml_path)  # ricarico i dati binnati della sorgente perché la variabile source è stata sovrascritta dal PointSource
+binned_data_source.load_binned_data_from_hdf5(binned_data=source_data_path)  # carico i conteggi binnati dal file HDF5 della sorgente
+
+binned_energy_edges = binned_data_source.binned_data.axes['Em'].edges.value  # estraggo i bordi dei bin energetici
+binned_energy = np.array([])  # inizializzo l'array dei centri dei bin energetici
+bin_sizes = np.array([])  # inizializzo l'array delle ampiezze dei bin energetici
+
+for i in range(len(binned_energy_edges) - 1):  # calcolo centro e ampiezza per ciascun bin energetico
+    binned_energy = np.append(binned_energy, (binned_energy_edges[i + 1] + binned_energy_edges[i]) / 2)  # aggiungo il centro del bin corrente
+    bin_sizes = np.append(bin_sizes, binned_energy_edges[i + 1] - binned_energy_edges[i])  # aggiungo l'ampiezza del bin corrente
+
+expectation = response.expectation()  # calcolo l'aspettazione del modello convoluto con la risposta del rilevatore
+
+fig, ax = plt.subplots()  # creo la figura per il confronto tra spettro convoluto e conteggi della sorgente
+
+ax.stairs(expectation.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='purple',
+          label="Best fit convolved with response")  # disegno l'istogramma del best fit convoluto con la risposta
+ax.errorbar(binned_energy, expectation.project('Em').to_dense(copy=False).contents,
+            yerr=np.sqrt(expectation.project('Em').to_dense(copy=False).contents), color='purple', linewidth=0,
+            elinewidth=1)  # aggiungo le barre d'errore poissoniane sul modello convoluto
+ax.stairs(binned_data_source.binned_data.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='black', ls=":",
+          label="Source counts")  # disegno l'istogramma dei conteggi binnati della sorgente
+ax.errorbar(binned_energy, binned_data_source.binned_data.project('Em').to_dense(copy=False).contents,
+            yerr=np.sqrt(binned_data_source.binned_data.project('Em').to_dense(copy=False).contents), color='black', linewidth=0,
+            elinewidth=1)  # aggiungo le barre d'errore poissoniane sui conteggi della sorgente
+
+ax.set_xscale("log")  # imposto la scala logaritmica sull'asse x
+ax.set_yscale("log")  # imposto la scala logaritmica sull'asse y
+
+ax.set_xlabel("Energy (keV)")  # imposto l'etichetta dell'asse delle energie
+ax.set_ylabel("Counts")  # imposto l'etichetta dell'asse dei conteggi
+
+_ = ax.legend()  # mostro la legenda del grafico
+
+ax.figure.savefig(output_dir / "convolved_spectrum_vs_fit.png", dpi=200, bbox_inches="tight")  # salvo il grafico nella cartella delle figure
+plt.close(fig)  # chiudo la figura per liberare memoria
+
+# Aggiungo il fondo
+expectation_bkg = bkg.expectation(copy=True)  # calcolo l'aspettazione del fondo atteso
+
+fig, ax = plt.subplots()  # creo la figura per il confronto tra modello più fondo e conteggi totali
+
+ax.stairs(expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(
+            copy=False).contents, binned_energy_edges, color='purple', label="Best fit convolved with response plus background")  # disegno la somma del modello convoluto e del fondo
+ax.errorbar(binned_energy,
+            expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(
+            copy=False).contents, yerr=np.sqrt(
+            expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(
+            copy=False).contents), color='purple', linewidth=0, elinewidth=1)  # aggiungo le barre d'errore sulla somma modello più fondo
+ax.stairs(data.data.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='black', ls=":",
+            label="Total counts")  # disegno i conteggi totali osservati
+ax.errorbar(binned_energy, data.data.project('Em').to_dense(copy=False).contents,
+            yerr=np.sqrt(data.data.project('Em').to_dense(copy=False).contents), color='black', linewidth=0,
+            elinewidth=1)  # aggiungo le barre d'errore sui conteggi totali
+
+ax.set_xscale("log")  # imposto la scala logaritmica sull'asse x
+ax.set_yscale("log")  # imposto la scala logaritmica sull'asse y
+
+ax.set_xlabel("Energy (keV)")  # imposto l'etichetta dell'asse delle energie
+ax.set_ylabel("Counts")  # imposto l'etichetta dell'asse dei conteggi
+
+ax.legend()  # mostro la legenda del grafico
+
+ax.figure.savefig(output_dir / "convolved_spectrum_vs_fit_with_background.png", dpi=200, bbox_inches="tight")  # salvo il grafico nella cartella delle figure
+plt.close(fig)  # chiudo la figura per liberare memoria
+
 t_end = time.perf_counter()
 elapsed = t_end - t_start
 minutes, seconds = divmod(elapsed, 60)
-print(f"Tempo totale di esecuzione: {int(minutes)}m {seconds:.2f}s ({elapsed:.2f}s)")
