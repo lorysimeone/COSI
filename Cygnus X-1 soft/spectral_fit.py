@@ -99,6 +99,19 @@ def load_psr(psr_template, path, point_source):
         print("Caricamento PSR fallito, ricalcolo:", type(e).__name__, e)
         return False
 
+from contextlib import contextmanager
+
+
+@contextmanager
+def _step_timer(label: str):
+    # Misuro il tempo trascorso per la singola fase di preparazione
+    t0 = time.perf_counter()
+    try:
+        yield
+    finally:
+        print(f"  [prepare_cosi_plugin] {label}: {time.perf_counter() - t0:.2f}s")
+
+
 def prepare_cosi_plugin(
     sc_orientation_path: Path,
     yaml_path: Path,
@@ -106,70 +119,77 @@ def prepare_cosi_plugin(
     bkg_data_path: Path,
     dr_path: Path,
 ):
-    # Carico il file di orientazione
-    sc_orientation = SpacecraftHistory.open(sc_orientation_path)
+    with _step_timer("SpacecraftHistory.open"):
+        # Carico il file di orientazione
+        sc_orientation = SpacecraftHistory.open(sc_orientation_path)
 
-    # Carico i dati binnati
-    source = BinnedData(yaml_path)
-    source.load_binned_data_from_hdf5(binned_data=source_data_path)
+    with _step_timer("load source BinnedData"):
+        # Carico i dati binnati
+        source = BinnedData(yaml_path)
+        source.load_binned_data_from_hdf5(binned_data=source_data_path)
 
-    # Carico i dati binnati del fondo
-    single_bkg_fit = True
-    bkg_binned = BinnedData(yaml_path)
-    bkg_binned.load_binned_data_from_hdf5(binned_data=bkg_data_path)
+    with _step_timer("load & project bkg BinnedData"):
+        # Carico i dati binnati del fondo
+        single_bkg_fit = True
+        bkg_binned = BinnedData(yaml_path)
+        bkg_binned.load_binned_data_from_hdf5(binned_data=bkg_data_path)
 
-    total_bkg = bkg_binned.binned_data.project('Em', 'Phi', 'PsiChi')
-    bkg_dist = {"total_bkg": total_bkg}
+        total_bkg = bkg_binned.binned_data.project('Em', 'Phi', 'PsiChi')
+        bkg_dist = {"total_bkg": total_bkg}
 
-    # Evito che ci siano bin simulati con valore 0
-    for bckfile in bkg_dist.keys():
-        bkg_dist[bckfile] += sys.float_info.min
+        # Evito che ci siano bin simulati con valore 0
+        for bckfile in bkg_dist.keys():
+            bkg_dist[bckfile] += sys.float_info.min
 
-    # Carico la risposta del rilevatore
-    dr = FullDetectorResponse.open(str(dr_path))
+    with _step_timer("project & sum source + bkg"):
+        # Incapsulo gli oggetti BinnedData nell'interfaccia appropriata
+        data = EmCDSBinnedData(source.binned_data.project('Em', 'Phi', 'PsiChi') + total_bkg)
 
-    # Incapsulo gli oggetti BinnedData nell'interfaccia appropriata
-    data = EmCDSBinnedData(source.binned_data.project('Em', 'Phi', 'PsiChi') + total_bkg)
+    with _step_timer("FreeNormBinnedBackground"):
+        # Uso il modello del fondo per inizializzare un'interfaccia di fondo atteso
+        # Per questo fondo, sono liberi solo i parametri di normalizzazione
+        bkg = FreeNormBinnedBackground(bkg_dist,
+                                       sc_history=sc_orientation,
+                                       copy=False)
 
-    # Uso il modello del fondo per inizializzare un'interfaccia di fondo atteso
-    # Per questo fondo, sono liberi solo i parametri di normalizzazione
-    bkg = FreeNormBinnedBackground(bkg_dist,
-                                   sc_history=sc_orientation,
-                                   copy=False)
+    with _step_timer("FullDetectorResponse.open + BinnedInstrumentResponse"):
+        # Carico la risposta del rilevatore
+        dr = FullDetectorResponse.open(str(dr_path))
 
-    # Wrape the raw response with BinnedInstrumentResponseInterface implementation
-    instrument_response = BinnedInstrumentResponse(dr, data)
+        # Wrape the raw response with BinnedInstrumentResponseInterface implementation
+        instrument_response = BinnedInstrumentResponse(dr, data)
 
-    # Inizializzo la PSR di 3ML
-    psr = BinnedThreeMLPointSourceResponse(data=data,
-                                           instrument_response=instrument_response,
-                                           sc_history=sc_orientation,
-                                           energy_axis=dr.axes['Ei'],
-                                           polarization_axis=dr.axes['Pol'] if 'Pol' in dr.axes.labels else None,
-                                           nside=2 * data.axes['PsiChi'].nside)
+    with _step_timer("BinnedThreeMLPointSourceResponse"):
+        # Inizializzo la PSR di 3ML
+        psr = BinnedThreeMLPointSourceResponse(data=data,
+                                               instrument_response=instrument_response,
+                                               sc_history=sc_orientation,
+                                               energy_axis=dr.axes['Ei'],
+                                               polarization_axis=dr.axes['Pol'] if 'Pol' in dr.axes.labels else None,
+                                               nside=2 * data.axes['PsiChi'].nside)
 
-    # Passo la PSR di 3ML alla funzione che esegue la convoluzione con lo spettro
-    response = BinnedThreeMLModelFolding(data=data, point_source_response=psr)
+    with _step_timer("BinnedThreeMLModelFolding + PoissonLikelihood + ThreeMLPluginInterface"):
+        # Passo la PSR di 3ML alla funzione che esegue la convoluzione con lo spettro
+        response = BinnedThreeMLModelFolding(data=data, point_source_response=psr)
 
-    like_fun = PoissonLikelihood(data, response, bkg)  # la likelihood da usare
+        like_fun = PoissonLikelihood(data, response, bkg)  # la likelihood da usare
 
-    # Creo il plugin di COSI
-    cosi = ThreeMLPluginInterface('cosi',
-                                  like_fun,
-                                  response,
-                                  bkg)
-    # Creo i parametri del fondo, ovvero le ampiezze per ogni bin
-    for bkg_label in bkg_dist.keys():
-        cosi.bkg_parameter[bkg_label] = Parameter(bkg_label,  # parametro del fondo
-                                                  1,  # valore iniziale del parametro
-                                                  min_value=0,  # valore minimo del parametro
-                                                  max_value=100 if single_bkg_fit else 20,  # valore massimo del parametro
-                                                  delta=0.05,  # passo iniziale usato dal minimizzatore
-                                                  unit=u.Hz  # unità: conteggi al secondo
-                                                  )
+        # Creo il plugin di COSI
+        cosi = ThreeMLPluginInterface('cosi',
+                                      like_fun,
+                                      response,
+                                      bkg)
+        # Creo i parametri del fondo, ovvero le ampiezze per ogni bin
+        for bkg_label in bkg_dist.keys():
+            cosi.bkg_parameter[bkg_label] = Parameter(bkg_label,  # parametro del fondo
+                                                      1,  # valore iniziale del parametro
+                                                      min_value=0,  # valore minimo del parametro
+                                                      max_value=100 if single_bkg_fit else 20,  # valore massimo del parametro
+                                                      delta=0.05,  # passo iniziale usato dal minimizzatore
+                                                      unit=u.Hz  # unità: conteggi al secondo
+                                                      )
 
     return cosi, response, bkg, source, data, psr
-
 
 data_path_ori_bkg = Path("/heronas/simeone/COSI/ori_bkg_yaml")
 data_path_cygnus_soft = Path("/heronas/simeone/COSI/Cygnus X-1 soft")
