@@ -109,7 +109,7 @@ def prepare_cosi_plugin(
     # Ispeziono la firma del costruttore e del metodo __init__
     print("Signature __init__:", inspect.signature(type(response).__init__))
 
-    '''# Provo a verificare se response supporta la serializzazione con pickle
+    # Provo a verificare se response supporta la serializzazione con pickle
     test_file = Path("test_response.pkl")
     try:
         with open(test_file, "wb") as f:
@@ -121,7 +121,7 @@ def prepare_cosi_plugin(
         print("Pickle non riuscito o problematico:", type(e).__name__, e)
     finally:
         if test_file.exists():
-            test_file.unlink()'''
+            test_file.unlink()
 
     like_fun = PoissonLikelihood(data, response, bkg)  # la likelihood da usare
 
@@ -252,7 +252,14 @@ ax.set_yscale("log")  # imposto la scala logaritmica sull'asse del flusso
 ax.set_xlabel("Energy (keV)")  # etichetta dell'asse x
 ax.set_ylabel(r"$E^2 \frac{dN}{dE}$ (keV cm$^{-2}$ s$^{-1}$)")  # etichetta dell'asse y
 
-ax.set_ylim(.1, 100)  # imposto i limiti verticali del plot
+y_positive = np.concatenate([
+    dat_e2_flux[dat_e2_flux > 0],
+    fit_e2_median[fit_e2_median > 0],
+    fit_e2_lo[fit_e2_lo > 0],
+    fit_e2_hi[fit_e2_hi > 0],
+])  # raccolgo tutti i valori positivi per adattare automaticamente l'asse y logaritmico
+if y_positive.size > 0:
+    ax.set_ylim(y_positive.min() * 0.7, y_positive.max() * 1.4)  # imposto un margine moltiplicativo automatico attorno ai dati e al fit
 
 _ = ax.legend()  # mostro la legenda aggiornata con i parametri e i punti del file .dat
 
