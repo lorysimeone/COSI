@@ -42,7 +42,52 @@ from astromodels import Parameter, Powerlaw
 
 from pathlib import Path
 
+import hashlib
 
+CACHE_DIR = Path("cache_psr")
+
+
+def psr_cache_file(l, b, sc_orientation_path, dr_path, yaml_path, nside):
+    h = hashlib.sha1()
+    for p in (sc_orientation_path, dr_path, yaml_path):
+        p = Path(p)
+        h.update(str(p.resolve()).encode())
+        h.update(str(p.stat().st_mtime_ns).encode())
+    h.update(f"{l:.6f}_{b:.6f}_{nside}".encode())
+    return CACHE_DIR / f"psr_l{l:.4f}_b{b:.4f}_{h.hexdigest()[:10]}.h5"
+
+
+def save_psr(psr_obj, path):
+    """Salva la PSR calcolata (psr_obj._psr) su HDF5."""
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    if psr_obj._psr is None:
+        print("PSR non ancora calcolata, niente da salvare")
+        return False
+    try:
+        psr_obj._psr.write(path, overwrite=True)
+        print(f"PSR salvata in {path}")
+        return True
+    except Exception as e:
+        print("Salvataggio PSR fallito:", type(e).__name__, e)
+        return False
+
+
+def load_psr(psr_obj, path, source_pointsource):
+    """Ripristina psr_obj._psr dal file e imposta la coordinata di cache."""
+    from cosipy.response import PointSourceResponse
+    if not Path(path).exists():
+        return False
+    try:
+        psr_obj._psr = PointSourceResponse.open(path)
+        psr_obj._last_convolved_source_skycoord = source_pointsource.position.sky_coord.copy()
+        print(f"PSR caricata da {path}")
+        return True
+    except Exception as e:
+        print("Caricamento PSR fallito, ricalcolo:", type(e).__name__, e)
+        psr_obj._psr = None
+        psr_obj._last_convolved_source_skycoord = None
+        return False
+    
 def prepare_cosi_plugin(
     sc_orientation_path: Path,
     yaml_path: Path,
