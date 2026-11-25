@@ -162,8 +162,8 @@ cosi, response, bkg, source, data = prepare_cosi_plugin(
 print(f"prepare_cosi_plugin: {time.perf_counter()-t0:.1f}s")
 
 # Definisco il modello di sorgente puntiforme
-l = 184.56
-b = -5.78
+l = 71.33496
+b = 3.066917
 
 spectrum = crea_modello_spettrale()
 
@@ -332,3 +332,4 @@ plt.close(fig)  # chiudo la figura per liberare memoria
 t_end = time.perf_counter()
 elapsed = t_end - t_start
 minutes, seconds = divmod(elapsed, 60)
+print(f"Tempo totale di esecuzione: {int(minutes)}m {seconds:.2f}s ({elapsed:.2f}s)")
