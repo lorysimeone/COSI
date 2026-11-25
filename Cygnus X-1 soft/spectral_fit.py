@@ -44,7 +44,80 @@ from pathlib import Path
 
 import hashlib
 
+from histpy import Histogram
+
 CACHE_DIR = Path("cache_psr")
+CACHE_BKG_DIR = Path("cache_bkg")
+CACHE_SC_DIR = Path("cache_sc")
+
+
+def _file_stamp(path: Path) -> str:
+    # Recupero percorso assoluto e timestamp di modifica per validare la cache
+    p = Path(path).resolve()
+    return f"{p}:{p.stat().st_mtime_ns}"
+
+
+def bkg_cache_file(bkg_data_path: Path, yaml_path: Path, axes=("Em", "Phi", "PsiChi")) -> Path:
+    # Calcolo un hash univoco in base ai file sorgente, ai loro timestamp e agli assi proiettati
+    h = hashlib.sha1()
+    h.update(_file_stamp(bkg_data_path).encode())
+    h.update(_file_stamp(yaml_path).encode())
+    h.update(",".join(axes).encode())
+    return CACHE_BKG_DIR / f"total_bkg_{h.hexdigest()[:10]}.h5"
+
+
+def sc_cache_file(sc_orientation_path: Path) -> Path:
+    # Calcolo un hash univoco in base al file FITS di orientazione e al suo timestamp
+    h = hashlib.sha1()
+    h.update(_file_stamp(sc_orientation_path).encode())
+    return CACHE_SC_DIR / f"sc_history_{h.hexdigest()[:10]}.pkl"
+
+
+def load_or_build_sc_history(sc_orientation_path: Path) -> SpacecraftHistory:
+    # Verifico se esiste già una copia in cache valida per l'attuale timestamp del FITS
+    cache_path = sc_cache_file(sc_orientation_path)
+    if cache_path.exists():
+        try:
+            with open(cache_path, "rb") as f:
+                sc_orientation = pickle.load(f)
+            print(f"SpacecraftHistory caricata da {cache_path}")
+            return sc_orientation
+        except Exception as e:
+            # Se la cache è corrotta o incompatibile, procedo con la lettura da FITS
+            print("Caricamento cache SpacecraftHistory fallito, rileggo FITS:", type(e).__name__, e)
+
+    sc_orientation = SpacecraftHistory.open(sc_orientation_path)
+    try:
+        CACHE_SC_DIR.mkdir(parents=True, exist_ok=True)
+        with open(cache_path, "wb") as f:
+            pickle.dump(sc_orientation, f, protocol=pickle.HIGHEST_PROTOCOL)
+        print(f"SpacecraftHistory salvata in {cache_path}")
+    except Exception as e:
+        print("Salvataggio cache SpacecraftHistory fallito:", type(e).__name__, e)
+    return sc_orientation
+
+
+def load_or_build_total_bkg(bkg_data_path: Path, yaml_path: Path, axes=("Em", "Phi", "PsiChi")):
+    # Verifico se esiste già l'istogramma proiettato in cache per i file correnti
+    cache_path = bkg_cache_file(bkg_data_path, yaml_path, axes=axes)
+    if cache_path.exists():
+        try:
+            total_bkg = Histogram.open(cache_path)
+            print(f"total_bkg caricato da {cache_path}")
+            return total_bkg
+        except Exception as e:
+            print("Caricamento cache total_bkg fallito, ricalcolo:", type(e).__name__, e)
+
+    bkg_binned = BinnedData(yaml_path)
+    bkg_binned.load_binned_data_from_hdf5(binned_data=bkg_data_path)
+    total_bkg = bkg_binned.binned_data.project(*axes)
+    try:
+        CACHE_BKG_DIR.mkdir(parents=True, exist_ok=True)
+        total_bkg.write(cache_path, overwrite=True)
+        print(f"total_bkg salvato in {cache_path}")
+    except Exception as e:
+        print("Salvataggio cache total_bkg fallito:", type(e).__name__, e)
+    return total_bkg
 
 
 def psr_cache_file(l, b, sc_orientation_path, dr_path, yaml_path, nside):
@@ -99,6 +172,7 @@ def load_psr(psr_template, path, point_source):
         print("Caricamento PSR fallito, ricalcolo:", type(e).__name__, e)
         return False
 
+
 from contextlib import contextmanager
 
 
@@ -120,8 +194,8 @@ def prepare_cosi_plugin(
     dr_path: Path,
 ):
     with _step_timer("SpacecraftHistory.open"):
-        # Carico il file di orientazione
-        sc_orientation = SpacecraftHistory.open(sc_orientation_path)
+        # Carico il file di orientazione (dalla cache se disponibile e aggiornata)
+        sc_orientation = load_or_build_sc_history(sc_orientation_path)
 
     with _step_timer("load source BinnedData"):
         # Carico i dati binnati
@@ -129,12 +203,9 @@ def prepare_cosi_plugin(
         source.load_binned_data_from_hdf5(binned_data=source_data_path)
 
     with _step_timer("load & project bkg BinnedData"):
-        # Carico i dati binnati del fondo
+        # Carico i dati binnati del fondo già proiettati (o li calcolo e li metto in cache)
         single_bkg_fit = True
-        bkg_binned = BinnedData(yaml_path)
-        bkg_binned.load_binned_data_from_hdf5(binned_data=bkg_data_path)
-
-        total_bkg = bkg_binned.binned_data.project('Em', 'Phi', 'PsiChi')
+        total_bkg = load_or_build_total_bkg(bkg_data_path, yaml_path, axes=('Em', 'Phi', 'PsiChi'))
         bkg_dist = {"total_bkg": total_bkg}
 
         # Evito che ci siano bin simulati con valore 0
@@ -190,6 +261,7 @@ def prepare_cosi_plugin(
                                                       )
 
     return cosi, response, bkg, source, data, psr
+
 
 data_path_ori_bkg = Path("/heronas/simeone/COSI/ori_bkg_yaml")
 data_path_cygnus_soft = Path("/heronas/simeone/COSI/Cygnus X-1 soft")
