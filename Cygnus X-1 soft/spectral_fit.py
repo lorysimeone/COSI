@@ -157,7 +157,7 @@ def prepare_cosi_plugin(
                                                   unit=u.Hz  # unità: conteggi al secondo
                                                   )
 
-    return cosi, response, bkg, source, data
+    return cosi, response, bkg, source, data, psr
 
 
 data_path_ori_bkg = Path("/heronas/simeone/COSI/ori_bkg_yaml")
@@ -170,12 +170,12 @@ bkg_data_path = data_path_ori_bkg / "bkg_binned_data.hdf5"
 dr_path = data_path_ori_bkg / "ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5"
 
 t0 = time.perf_counter()
-cosi, response, bkg, source, data = prepare_cosi_plugin(
-    sc_orientation_path= sc_orientation_path,
-    yaml_path = yaml_path,
-    source_data_path = source_data_path,
-    bkg_data_path = bkg_data_path,
-    dr_path = dr_path)
+cosi, response, bkg, source, data, psr = prepare_cosi_plugin(
+    sc_orientation_path=sc_orientation_path,
+    yaml_path=yaml_path,
+    source_data_path=source_data_path,
+    bkg_data_path=bkg_data_path,
+    dr_path=dr_path)
 print(f"prepare_cosi_plugin: {time.perf_counter()-t0:.1f}s")
 
 # Definisco il modello di sorgente puntiforme
@@ -188,15 +188,23 @@ source = PointSource("source",  # nome della sorgente (arbitrario, ma deve esser
                      l=l,  # Longitude (deg)
                      b=b,  # Latitude (deg)
                      spectral_shape=spectrum)  # Spectral model
-model = Model(source)  # Modello a unica sorgente (altrimenti è Model(source1, source2, ...))
+mmodel = Model(source)  # Modello a unica sorgente
 
-plugins = DataList(cosi)  # raccoglie il dataset da usare nel fit
+cache_file = psr_cache_file(l, b, sc_orientation_path, dr_path, yaml_path,
+                            nside=2 * data.axes['PsiChi'].nside)
 
-like = JointLikelihood(model, plugins, verbose=False)  # calcola la verosomiglianza
-like = JointLikelihood(model, plugins, verbose=False)  # calcola la verosomiglianza
+response.set_model(model)
+loaded = load_psr(psr, cache_file, source)
+
+plugins = DataList(cosi)
+like = JointLikelihood(model, plugins, verbose=False)
 
 t0 = time.perf_counter()
 results, like_df = like.fit()
+print(f"fit: {time.perf_counter()-t0:.1f}s")
+
+if not loaded:
+    save_psr(psr, cache_file)
 print(f"fit: {time.perf_counter()-t0:.1f}s")
 print(results)
 print(like_df)
@@ -268,6 +276,11 @@ ax.set_yscale("log")  # imposto la scala logaritmica sull'asse del flusso
 
 ax.set_xlabel("Energy (keV)")  # etichetta dell'asse x
 ax.set_ylabel(r"$E^2 \frac{dN}{dE}$ (keV cm$^{-2}$ s$^{-1}$)")  # etichetta dell'asse y
+
+dat_e2_flux = dat_energies**2 * dat_fluxes
+fit_e2_median = energy**2 * flux_median
+fit_e2_lo = energy**2 * flux_lo
+fit_e2_hi = energy**2 * flux_hi
 
 y_positive = np.concatenate([
     dat_e2_flux[dat_e2_flux > 0],
