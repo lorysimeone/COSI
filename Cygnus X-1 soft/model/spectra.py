@@ -89,5 +89,6 @@ ax.tick_params(axis="both", which="major", labelsize=12)
 ax.legend(fontsize=8, loc="upper right", frameon=True, fancybox=True)
 
 fig.savefig(out_file, dpi=200, bbox_inches="tight")
+plt.show()
 plt.close(fig)
 print(f"Salvato: {out_file}")

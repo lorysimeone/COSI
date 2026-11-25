@@ -12,7 +12,7 @@ _fit_function_dir = Path("/heronas/simeone/COSI/Cygnus X-1 soft/model")
 if str(_fit_function_dir) not in _sys.path:
     _sys.path.insert(0, str(_fit_function_dir))
 
-from fit_function import crea_modello_spettrale
+from fit_function import power_model
 
 import logging
 
@@ -165,7 +165,7 @@ print(f"prepare_cosi_plugin: {time.perf_counter()-t0:.1f}s")
 l = 71.33496
 b = 3.066917
 
-spectrum = crea_modello_spettrale()
+spectrum = power_model()
 
 source = PointSource("source",  # nome della sorgente (arbitrario, ma deve essere univoco)
                      l=l,  # Longitude (deg)

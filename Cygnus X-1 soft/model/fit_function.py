@@ -2,7 +2,7 @@ import astropy.units as u
 from astromodels import Powerlaw
 
 
-def crea_modello_spettrale(index=-2.0, piv=100.0 * u.keV, K=8.6e-5 / u.cm / u.cm / u.s / u.keV):
+def power_model(index=-2.7, piv=100.0 * u.keV, K=8.6e-5 / u.cm / u.cm / u.s / u.keV):
     spectrum = Powerlaw()  # creo il modello spettrale a legge di potenza singola
 
     spectrum.index.min_value = -6.0  # imposto il limite inferiore per l'indice spettrale
