@@ -87,7 +87,7 @@ def load_psr(psr_obj, path, source_pointsource):
         psr_obj._psr = None
         psr_obj._last_convolved_source_skycoord = None
         return False
-    
+
 def prepare_cosi_plugin(
     sc_orientation_path: Path,
     yaml_path: Path,
@@ -139,29 +139,6 @@ def prepare_cosi_plugin(
 
     # Passo la PSR di 3ML alla funzione che esegue la convoluzione con lo spettro
     response = BinnedThreeMLModelFolding(data=data, point_source_response=psr)
-
-    import inspect
-
-    print("PSR tipo:", type(psr))
-    print("PSR MRO:", [c.__name__ for c in type(psr).__mro__])
-    print("PSR attributi:", [n for n in dir(psr) if not n.startswith("_")])
-    print("PSR vars:", list(vars(psr).keys()))
-    print("PSR __init__:", inspect.signature(type(psr).__init__))
-
-    print("RESPONSE vars:", list(vars(response).keys()))
-
-    import cosipy.response.threeml_response as tr
-    mixin = tr.ThreeMLModelFoldingCacheSourceResponsesMixin
-    print("MIXIN attributi:", [n for n in dir(mixin) if not n.startswith("__")])
-
-    with open("psr_source.txt", "w") as f:
-        f.write(inspect.getsource(type(psr)))
-    with open("response_source.txt", "w") as f:
-        f.write(inspect.getsource(type(response)))
-    with open("mixin_source.txt", "w") as f:
-        f.write(inspect.getsource(mixin))
-
-    sys.exit()
 
     import inspect
     import pickle
