@@ -57,14 +57,21 @@ def psr_cache_file(l, b, sc_orientation_path, dr_path, yaml_path, nside):
     return CACHE_DIR / f"psr_l{l:.4f}_b{b:.4f}_{h.hexdigest()[:10]}.h5"
 
 
-def save_psr(psr_obj, path):
-    """Salva la PSR calcolata (psr_obj._psr) su HDF5."""
+def get_source_psr(response, name="source"):
+    """Restituisce la PSR per-sorgente (quella che contiene davvero il risultato)."""
+    return getattr(response, "_source_responses", {}).get(name)
+
+
+def save_psr(target, path):
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    if psr_obj._psr is None:
+    if target is None or target._psr is None:
         print("PSR non ancora calcolata, niente da salvare")
         return False
     try:
-        psr_obj._psr.write(path, overwrite=True)
+        target._psr.write(path, overwrite=True)
+        with open(Path(path).with_suffix(".meta.pkl"), "wb") as f:
+            pickle.dump({"skycoord": target._last_convolved_source_skycoord,
+                         "dict": target._last_convolved_source_dict}, f)
         print(f"PSR salvata in {path}")
         return True
     except Exception as e:
@@ -72,20 +79,24 @@ def save_psr(psr_obj, path):
         return False
 
 
-def load_psr(psr_obj, path, source_pointsource):
-    """Ripristina psr_obj._psr dal file e imposta la coordinata di cache."""
+def load_psr(target, path):
     from cosipy.response import PointSourceResponse
-    if not Path(path).exists():
+    meta_path = Path(path).with_suffix(".meta.pkl")
+    if not Path(path).exists() or not meta_path.exists():
         return False
     try:
-        psr_obj._psr = PointSourceResponse.open(path)
-        psr_obj._last_convolved_source_skycoord = source_pointsource.position.sky_coord.copy()
+        with open(meta_path, "rb") as f:
+            meta = pickle.load(f)
+        target._psr = PointSourceResponse.open(path)
+        target._last_convolved_source_skycoord = meta["skycoord"]
+        target._last_convolved_source_dict = meta["dict"]
         print(f"PSR caricata da {path}")
         return True
     except Exception as e:
         print("Caricamento PSR fallito, ricalcolo:", type(e).__name__, e)
-        psr_obj._psr = None
-        psr_obj._last_convolved_source_skycoord = None
+        target._psr = None
+        target._last_convolved_source_skycoord = None
+        target._last_convolved_source_dict = None
         return False
 
 def prepare_cosi_plugin(
@@ -194,7 +205,9 @@ cache_file = psr_cache_file(l, b, sc_orientation_path, dr_path, yaml_path,
                             nside=2 * data.axes['PsiChi'].nside)
 
 response.set_model(model)
-loaded = load_psr(psr, cache_file, source)
+sr = get_source_psr(response)
+print("PSR per-sorgente disponibile dopo set_model:", sr is not None)
+loaded = load_psr(sr if sr is not None else psr, cache_file)
 
 plugins = DataList(cosi)
 like = JointLikelihood(model, plugins, verbose=False)
@@ -203,19 +216,8 @@ t0 = time.perf_counter()
 results, like_df = like.fit()
 print(f"fit: {time.perf_counter()-t0:.1f}s")
 
-print("=== DEBUG PSR ===")
-print("psr:", type(psr), list(vars(psr).keys()))
-print("response:", type(response), list(vars(response).keys()))
-for name, obj in vars(response).items():
-    if hasattr(obj, "__dict__") and "psr" in name.lower():
-        print(name, type(obj), list(vars(obj).keys()))
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            print(f"{name}[{k!r}]:", type(v), list(vars(v).keys()) if hasattr(v, "__dict__") else "")
-
 if not loaded:
-    save_psr(psr, cache_file)
-print(f"fit: {time.perf_counter()-t0:.1f}s")
+    save_psr(get_source_psr(response), cache_file)
 print(results)
 print(like_df)
 
