@@ -203,6 +203,16 @@ t0 = time.perf_counter()
 results, like_df = like.fit()
 print(f"fit: {time.perf_counter()-t0:.1f}s")
 
+print("=== DEBUG PSR ===")
+print("psr:", type(psr), list(vars(psr).keys()))
+print("response:", type(response), list(vars(response).keys()))
+for name, obj in vars(response).items():
+    if hasattr(obj, "__dict__") and "psr" in name.lower():
+        print(name, type(obj), list(vars(obj).keys()))
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            print(f"{name}[{k!r}]:", type(v), list(vars(v).keys()) if hasattr(v, "__dict__") else "")
+
 if not loaded:
     save_psr(psr, cache_file)
 print(f"fit: {time.perf_counter()-t0:.1f}s")
