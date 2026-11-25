@@ -4,9 +4,11 @@ t_start = time.perf_counter()
 
 import sys
 import pickle
-
+import hashlib
+import logging
 from pathlib import Path
 import sys as _sys
+from contextlib import contextmanager
 
 _fit_function_dir = Path("/heronas/simeone/COSI/Cygnus X-1 soft/model")
 if str(_fit_function_dir) not in _sys.path:
@@ -14,37 +16,28 @@ if str(_fit_function_dir) not in _sys.path:
 
 from fit_function import power_model
 
-import logging
-
 logging.basicConfig(level=logging.INFO)  # attivo i log informativi durante i caricamenti
 
 from cosipy import BinnedData
 from cosipy.spacecraftfile import SpacecraftHistory
 from cosipy.response.FullDetectorResponse import FullDetectorResponse
-from cosipy.util import fetch_wasabi_file
 
 from cosipy.statistics import PoissonLikelihood
 from cosipy.background_estimation import FreeNormBinnedBackground
 from cosipy.interfaces import ThreeMLPluginInterface
 from cosipy.response import BinnedThreeMLModelFolding, BinnedInstrumentResponse, BinnedThreeMLPointSourceResponse
 from cosipy.data_io import EmCDSBinnedData
+from histpy import Histogram
 
 import astropy.units as u
-
 import numpy as np
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from threeML import Band, PointSource, Model, JointLikelihood, DataList
-from astromodels import Parameter, Powerlaw
-
-from pathlib import Path
-
-import hashlib
-
-from histpy import Histogram
+from threeML import PointSource, Model, JointLikelihood, DataList
+from astromodels import Parameter
 
 CACHE_DIR = Path("cache_psr")
 CACHE_BKG_DIR = Path("cache_bkg")
@@ -73,8 +66,8 @@ def sc_cache_file(sc_orientation_path: Path) -> Path:
     return CACHE_SC_DIR / f"sc_history_{h.hexdigest()[:10]}.pkl"
 
 
-def load_or_build_sc_history(sc_orientation_path: Path) -> SpacecraftHistory:
-    # Verifico se esiste già una copia in cache valida per l'attuale timestamp del FITS
+def load_sc_history(sc_orientation_path: Path) -> SpacecraftHistory:
+    # Carico la storia del satellite dalla cache se disponibile, altrimenti leggo il FITS
     cache_path = sc_cache_file(sc_orientation_path)
     if cache_path.exists():
         try:
@@ -83,22 +76,12 @@ def load_or_build_sc_history(sc_orientation_path: Path) -> SpacecraftHistory:
             print(f"SpacecraftHistory caricata da {cache_path}")
             return sc_orientation
         except Exception as e:
-            # Se la cache è corrotta o incompatibile, procedo con la lettura da FITS
             print("Caricamento cache SpacecraftHistory fallito, rileggo FITS:", type(e).__name__, e)
-
-    sc_orientation = SpacecraftHistory.open(sc_orientation_path)
-    try:
-        CACHE_SC_DIR.mkdir(parents=True, exist_ok=True)
-        with open(cache_path, "wb") as f:
-            pickle.dump(sc_orientation, f, protocol=pickle.HIGHEST_PROTOCOL)
-        print(f"SpacecraftHistory salvata in {cache_path}")
-    except Exception as e:
-        print("Salvataggio cache SpacecraftHistory fallito:", type(e).__name__, e)
-    return sc_orientation
+    return SpacecraftHistory.open(sc_orientation_path)
 
 
-def load_or_build_total_bkg(bkg_data_path: Path, yaml_path: Path, axes=("Em", "Phi", "PsiChi")):
-    # Verifico se esiste già l'istogramma proiettato in cache per i file correnti
+def load_total_bkg(bkg_data_path: Path, yaml_path: Path, axes=("Em", "Phi", "PsiChi")):
+    # Carico l'istogramma del fondo dalla cache se disponibile, altrimenti lo calcolo
     cache_path = bkg_cache_file(bkg_data_path, yaml_path, axes=axes)
     if cache_path.exists():
         try:
@@ -110,17 +93,11 @@ def load_or_build_total_bkg(bkg_data_path: Path, yaml_path: Path, axes=("Em", "P
 
     bkg_binned = BinnedData(yaml_path)
     bkg_binned.load_binned_data_from_hdf5(binned_data=bkg_data_path)
-    total_bkg = bkg_binned.binned_data.project(*axes)
-    try:
-        CACHE_BKG_DIR.mkdir(parents=True, exist_ok=True)
-        total_bkg.write(cache_path, overwrite=True)
-        print(f"total_bkg salvato in {cache_path}")
-    except Exception as e:
-        print("Salvataggio cache total_bkg fallito:", type(e).__name__, e)
-    return total_bkg
+    return bkg_binned.binned_data.project(*axes)
 
 
 def psr_cache_file(l, b, sc_orientation_path, dr_path, yaml_path, nside):
+    # Calcolo il percorso della PSR in cache in base a coordinate, nside e file di input
     h = hashlib.sha1()
     for p in (sc_orientation_path, dr_path, yaml_path):
         p = Path(p)
@@ -131,7 +108,7 @@ def psr_cache_file(l, b, sc_orientation_path, dr_path, yaml_path, nside):
 
 
 def save_psr(response, path, name="source"):
-    """Salva la PSR calcolata dalla copia per-sorgente creata dal folding."""
+    # Salvo la PSR calcolata dalla copia per-sorgente creata dal folding
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     sr = getattr(response, "_source_responses", {}).get(name)
     if sr is None or sr._psr is None:
@@ -147,10 +124,7 @@ def save_psr(response, path, name="source"):
 
 
 def load_psr(psr_template, path, point_source):
-    """
-    Fa in modo che ogni copia creata da psr_template.copy() parta con la PSR
-    già caricata e la coordinata della sorgente, così expectation() non la ricalcola.
-    """
+    # Inietto la PSR già calcolata nelle copie create da psr_template.copy()
     from cosipy.response import PointSourceResponse
     if not Path(path).exists():
         return False
@@ -173,12 +147,9 @@ def load_psr(psr_template, path, point_source):
         return False
 
 
-from contextlib import contextmanager
-
-
 @contextmanager
 def _step_timer(label: str):
-    # Misuro il tempo trascorso per la singola fase di preparazione
+    # Misuro il tempo trascorso per la singola fase di preparazione del plugin
     t0 = time.perf_counter()
     try:
         yield
@@ -193,19 +164,19 @@ def prepare_cosi_plugin(
     bkg_data_path: Path,
     dr_path: Path,
 ):
-    with _step_timer("SpacecraftHistory.open"):
-        # Carico il file di orientazione (dalla cache se disponibile e aggiornata)
-        sc_orientation = load_or_build_sc_history(sc_orientation_path)
+    with _step_timer("SpacecraftHistory load"):
+        # Carico il file di orientazione
+        sc_orientation = load_sc_history(sc_orientation_path)
 
     with _step_timer("load source BinnedData"):
-        # Carico i dati binnati
+        # Carico i dati binnati della sorgente
         source = BinnedData(yaml_path)
         source.load_binned_data_from_hdf5(binned_data=source_data_path)
 
     with _step_timer("load & project bkg BinnedData"):
-        # Carico i dati binnati del fondo già proiettati (o li calcolo e li metto in cache)
+        # Carico i dati binnati del fondo già proiettati
         single_bkg_fit = True
-        total_bkg = load_or_build_total_bkg(bkg_data_path, yaml_path, axes=('Em', 'Phi', 'PsiChi'))
+        total_bkg = load_total_bkg(bkg_data_path, yaml_path, axes=("Em", "Phi", "PsiChi"))
         bkg_dist = {"total_bkg": total_bkg}
 
         # Evito che ci siano bin simulati con valore 0
@@ -213,52 +184,42 @@ def prepare_cosi_plugin(
             bkg_dist[bckfile] += sys.float_info.min
 
     with _step_timer("project & sum source + bkg"):
-        # Incapsulo gli oggetti BinnedData nell'interfaccia appropriata
-        data = EmCDSBinnedData(source.binned_data.project('Em', 'Phi', 'PsiChi') + total_bkg)
+        # Incapsulo i conteggi totali nell'interfaccia appropriata
+        data = EmCDSBinnedData(source.binned_data.project("Em", "Phi", "PsiChi") + total_bkg)
 
     with _step_timer("FreeNormBinnedBackground"):
-        # Uso il modello del fondo per inizializzare un'interfaccia di fondo atteso
-        # Per questo fondo, sono liberi solo i parametri di normalizzazione
+        # Inizializzo il fondo con normalizzazione libera
         bkg = FreeNormBinnedBackground(bkg_dist,
                                        sc_history=sc_orientation,
                                        copy=False)
 
     with _step_timer("FullDetectorResponse.open + BinnedInstrumentResponse"):
-        # Carico la risposta del rilevatore
+        # Carico la risposta del rilevatore e la associo ai dati
         dr = FullDetectorResponse.open(str(dr_path))
-
-        # Wrape the raw response with BinnedInstrumentResponseInterface implementation
         instrument_response = BinnedInstrumentResponse(dr, data)
 
     with _step_timer("BinnedThreeMLPointSourceResponse"):
-        # Inizializzo la PSR di 3ML
+        # Inizializzo la PSR per 3ML
         psr = BinnedThreeMLPointSourceResponse(data=data,
                                                instrument_response=instrument_response,
                                                sc_history=sc_orientation,
-                                               energy_axis=dr.axes['Ei'],
-                                               polarization_axis=dr.axes['Pol'] if 'Pol' in dr.axes.labels else None,
-                                               nside=2 * data.axes['PsiChi'].nside)
+                                               energy_axis=dr.axes["Ei"],
+                                               polarization_axis=dr.axes["Pol"] if "Pol" in dr.axes.labels else None,
+                                               nside=2 * data.axes["PsiChi"].nside)
 
     with _step_timer("BinnedThreeMLModelFolding + PoissonLikelihood + ThreeMLPluginInterface"):
-        # Passo la PSR di 3ML alla funzione che esegue la convoluzione con lo spettro
+        # Collego folding spettrale, likelihood di Poisson e plugin di 3ML
         response = BinnedThreeMLModelFolding(data=data, point_source_response=psr)
+        like_fun = PoissonLikelihood(data, response, bkg)
+        cosi = ThreeMLPluginInterface("cosi", like_fun, response, bkg)
 
-        like_fun = PoissonLikelihood(data, response, bkg)  # la likelihood da usare
-
-        # Creo il plugin di COSI
-        cosi = ThreeMLPluginInterface('cosi',
-                                      like_fun,
-                                      response,
-                                      bkg)
-        # Creo i parametri del fondo, ovvero le ampiezze per ogni bin
         for bkg_label in bkg_dist.keys():
-            cosi.bkg_parameter[bkg_label] = Parameter(bkg_label,  # parametro del fondo
-                                                      1,  # valore iniziale del parametro
-                                                      min_value=0,  # valore minimo del parametro
-                                                      max_value=100 if single_bkg_fit else 20,  # valore massimo del parametro
-                                                      delta=0.05,  # passo iniziale usato dal minimizzatore
-                                                      unit=u.Hz  # unità: conteggi al secondo
-                                                      )
+            cosi.bkg_parameter[bkg_label] = Parameter(bkg_label,
+                                                      1,
+                                                      min_value=0,
+                                                      max_value=100 if single_bkg_fit else 20,
+                                                      delta=0.05,
+                                                      unit=u.Hz)
 
     return cosi, response, bkg, source, data, psr
 
@@ -287,14 +248,14 @@ b = 3.066917
 
 spectrum = power_model()
 
-source = PointSource("source",  # nome della sorgente (arbitrario, ma deve essere univoco)
-                     l=l,  # Longitude (deg)
-                     b=b,  # Latitude (deg)
-                     spectral_shape=spectrum)  # Spectral model
-model = Model(source)  # Modello a unica sorgente
+source = PointSource("source",
+                     l=l,
+                     b=b,
+                     spectral_shape=spectrum)
+model = Model(source)
 
 cache_file = psr_cache_file(l, b, sc_orientation_path, dr_path, yaml_path,
-                            nside=2 * data.axes['PsiChi'].nside)
+                            nside=2 * data.axes["PsiChi"].nside)
 
 response.set_model(model)
 loaded = load_psr(psr, cache_file, source)
@@ -311,10 +272,7 @@ if not loaded:
 print(results)
 print(like_df)
 
-# Definisco i risultati per il confronto
-
 results = like.results
-
 print(results.display())
 
 parameters = {par.name: results.get_variates(par.path)
@@ -338,46 +296,45 @@ for i, e in enumerate(energy):
     flux_lo[i], flux_hi[i] = flux.equal_tail_interval(cl=0.68)
 
 # Plotto lo spettro fittato (con la sua banda d'errore al 68%) e i punti del file .dat
-fig, ax = plt.subplots()  # creo una nuova figura per il plot dello spettro fittato
+fig, ax = plt.subplots()
 
-dat_file_path = data_path_cygnus_soft / "model/cygX1_soft_spec.dat"  # definisco il percorso del file .dat dello spettro
-dat_energies = []  # preparo la lista per le energie lette dal file .dat
-dat_fluxes = []  # preparo la lista per i flussi differenziali letti dal file .dat
+dat_file_path = data_path_cygnus_soft / "model/cygX1_soft_spec.dat"
+dat_energies = []
+dat_fluxes = []
 
-with open(dat_file_path, "r") as f:  # apro il file .dat in lettura
-    for line in f:  # leggo il file riga per riga
-        parts = line.strip().split()  # rimuovo gli spazi superflui e divido la riga in campi
-        if len(parts) == 3 and parts[0] == "DP":  # considero solo le righe dati formattate come DP <energia> <flusso>
-            dat_energies.append(float(parts[1]))  # aggiungo l'energia in keV
-            dat_fluxes.append(float(parts[2]))  # aggiungo il flusso differenziale in ph cm^-2 s^-1 keV^-1
+with open(dat_file_path, "r") as f:
+    for line in f:
+        parts = line.strip().split()
+        if len(parts) == 3 and parts[0] == "DP":
+            dat_energies.append(float(parts[1]))
+            dat_fluxes.append(float(parts[2]))
 
-dat_energies = np.array(dat_energies)  # converto le energie in un array NumPy
-dat_fluxes = np.array(dat_fluxes)  # converto i flussi in un array NumPy
+dat_energies = np.array(dat_energies)
+dat_fluxes = np.array(dat_fluxes)
 
-ax.scatter(dat_energies, dat_energies * dat_energies * dat_fluxes, color="black", s=6, zorder=4, label="cygX1_soft_spec.dat")  # aggiungo lo scatter plot dei punti del file .dat in scala E^2 dN/dE
+ax.scatter(dat_energies, dat_energies * dat_energies * dat_fluxes, color="black", s=6, zorder=4, label="cygX1_soft_spec.dat")
 
-spec_opt = results.optimized_model["source"].spectrum.main.shape  # recupero il modello spettrale ottimizzato
-k_val = spec_opt.K.value  # estraggo il valore fittato di K
-idx_val = spec_opt.index.value  # estraggo il valore fittato dell'indice spettrale
-piv_val = spec_opt.piv.value  # estraggo il valore dell'energia di pivot
+spec_opt = results.optimized_model["source"].spectrum.main.shape
+k_val = spec_opt.K.value
+idx_val = spec_opt.index.value
+piv_val = spec_opt.piv.value
 
-k_err = results.get_variates(spec_opt.K.path).std  # calcolo l'incertezza su K dai variates del fit
-idx_err = results.get_variates(spec_opt.index.path).std  # calcolo l'incertezza sull'indice spettrale dai variates del fit
+k_err = results.get_variates(spec_opt.K.path).std
+idx_err = results.get_variates(spec_opt.index.path).std
 
-fit_label = (  # preparo l'etichetta della legenda con i parametri del fit
+fit_label = (
     f"Best fit\n"
     f"K = {k_val:.2e} ± {k_err:.2e} (at {piv_val:g} keV)\n"
     f"index = {idx_val:.2f} ± {idx_err:.2f}"
 )
 
-ax.plot(energy, energy * energy * flux_median, label=fit_label)  # traccio la mediana dello spettro fittato includendo i parametri in legenda
-ax.fill_between(energy, energy * energy * flux_lo, energy * energy * flux_hi, alpha=.5, label="Best fit (errors)")  # ombreggio l'intervallo al 68%
+ax.plot(energy, energy * energy * flux_median, label=fit_label)
+ax.fill_between(energy, energy * energy * flux_lo, energy * energy * flux_hi, alpha=.5, label="Best fit (errors)")
 
-ax.set_xscale("log")  # imposto la scala logaritmica sull'asse delle energie
-ax.set_yscale("log")  # imposto la scala logaritmica sull'asse del flusso
-
-ax.set_xlabel("Energy (keV)")  # etichetta dell'asse x
-ax.set_ylabel(r"$E^2 \frac{dN}{dE}$ (keV cm$^{-2}$ s$^{-1}$)")  # etichetta dell'asse y
+ax.set_xscale("log")
+ax.set_yscale("log")
+ax.set_xlabel("Energy (keV)")
+ax.set_ylabel(r"$E^2 \frac{dN}{dE}$ (keV cm$^{-2}$ s$^{-1}$)")
 
 dat_e2_flux = dat_energies**2 * dat_fluxes
 fit_e2_median = energy**2 * flux_median
@@ -389,84 +346,79 @@ y_positive = np.concatenate([
     fit_e2_median[fit_e2_median > 0],
     fit_e2_lo[fit_e2_lo > 0],
     fit_e2_hi[fit_e2_hi > 0],
-])  # raccolgo tutti i valori positivi per adattare automaticamente l'asse y logaritmico
+])
 if y_positive.size > 0:
-    ax.set_ylim(y_positive.min() * 0.7, y_positive.max() * 1.4)  # imposto un margine moltiplicativo automatico attorno ai dati e al fit
+    ax.set_ylim(y_positive.min() * 0.7, y_positive.max() * 1.4)
 
-_ = ax.legend()  # mostro la legenda aggiornata con i parametri e i punti del file .dat
+_ = ax.legend()
 
-output_dir = Path("spectra_figures")  # definisco il percorso della cartella di destinazione per le figure
-output_dir.mkdir(parents=True, exist_ok=True)  # creo la cartella e le eventuali cartelle intermedie se non esistono già
-ax.figure.savefig(output_dir / "fitted_spectrum_power_law.png", dpi=200, bbox_inches="tight")  # salvo il plot dello spettro fittato dentro la cartella
-plt.close(fig)  # chiudo la figura per liberare memoria
+output_dir = Path("spectra_figures")
+output_dir.mkdir(parents=True, exist_ok=True)
+ax.figure.savefig(output_dir / "fitted_spectrum_power_law.png", dpi=200, bbox_inches="tight")
+plt.close(fig)
 
 # Plotto lo spettro convoluto con la risposta e lo spettro fittato
+binned_data_source = BinnedData(yaml_path)
+binned_data_source.load_binned_data_from_hdf5(binned_data=source_data_path)
 
-binned_data_source = BinnedData(yaml_path)  # ricarico i dati binnati della sorgente perché la variabile source è stata sovrascritta dal PointSource
-binned_data_source.load_binned_data_from_hdf5(binned_data=source_data_path)  # carico i conteggi binnati dal file HDF5 della sorgente
+binned_energy_edges = binned_data_source.binned_data.axes["Em"].edges.value
+binned_energy = np.array([])
+bin_sizes = np.array([])
 
-binned_energy_edges = binned_data_source.binned_data.axes['Em'].edges.value  # estraggo i bordi dei bin energetici
-binned_energy = np.array([])  # inizializzo l'array dei centri dei bin energetici
-bin_sizes = np.array([])  # inizializzo l'array delle ampiezze dei bin energetici
+for i in range(len(binned_energy_edges) - 1):
+    binned_energy = np.append(binned_energy, (binned_energy_edges[i + 1] + binned_energy_edges[i]) / 2)
+    bin_sizes = np.append(bin_sizes, binned_energy_edges[i + 1] - binned_energy_edges[i])
 
-for i in range(len(binned_energy_edges) - 1):  # calcolo centro e ampiezza per ciascun bin energetico
-    binned_energy = np.append(binned_energy, (binned_energy_edges[i + 1] + binned_energy_edges[i]) / 2)  # aggiungo il centro del bin corrente
-    bin_sizes = np.append(bin_sizes, binned_energy_edges[i + 1] - binned_energy_edges[i])  # aggiungo l'ampiezza del bin corrente
+expectation = response.expectation()
 
-expectation = response.expectation()  # calcolo l'aspettazione del modello convoluto con la risposta del rilevatore
+fig, ax = plt.subplots()
 
-fig, ax = plt.subplots()  # creo la figura per il confronto tra spettro convoluto e conteggi della sorgente
+ax.stairs(expectation.project("Em").to_dense(copy=False).contents, binned_energy_edges, color="purple",
+          label="Best fit convolved with response")
+ax.errorbar(binned_energy, expectation.project("Em").to_dense(copy=False).contents,
+            yerr=np.sqrt(expectation.project("Em").to_dense(copy=False).contents), color="purple", linewidth=0,
+            elinewidth=1)
+ax.stairs(binned_data_source.binned_data.project("Em").to_dense(copy=False).contents, binned_energy_edges, color="black", ls=":",
+          label="Source counts")
+ax.errorbar(binned_energy, binned_data_source.binned_data.project("Em").to_dense(copy=False).contents,
+            yerr=np.sqrt(binned_data_source.binned_data.project("Em").to_dense(copy=False).contents), color="black", linewidth=0,
+            elinewidth=1)
 
-ax.stairs(expectation.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='purple',
-          label="Best fit convolved with response")  # disegno l'istogramma del best fit convoluto con la risposta
-ax.errorbar(binned_energy, expectation.project('Em').to_dense(copy=False).contents,
-            yerr=np.sqrt(expectation.project('Em').to_dense(copy=False).contents), color='purple', linewidth=0,
-            elinewidth=1)  # aggiungo le barre d'errore poissoniane sul modello convoluto
-ax.stairs(binned_data_source.binned_data.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='black', ls=":",
-          label="Source counts")  # disegno l'istogramma dei conteggi binnati della sorgente
-ax.errorbar(binned_energy, binned_data_source.binned_data.project('Em').to_dense(copy=False).contents,
-            yerr=np.sqrt(binned_data_source.binned_data.project('Em').to_dense(copy=False).contents), color='black', linewidth=0,
-            elinewidth=1)  # aggiungo le barre d'errore poissoniane sui conteggi della sorgente
+ax.set_xscale("log")
+ax.set_yscale("log")
+ax.set_xlabel("Energy (keV)")
+ax.set_ylabel("Counts")
+_ = ax.legend()
 
-ax.set_xscale("log")  # imposto la scala logaritmica sull'asse x
-ax.set_yscale("log")  # imposto la scala logaritmica sull'asse y
-
-ax.set_xlabel("Energy (keV)")  # imposto l'etichetta dell'asse delle energie
-ax.set_ylabel("Counts")  # imposto l'etichetta dell'asse dei conteggi
-
-_ = ax.legend()  # mostro la legenda del grafico
-
-ax.figure.savefig(output_dir / "convolved_spectrum_vs_fit.png", dpi=200, bbox_inches="tight")  # salvo il grafico nella cartella delle figure
-plt.close(fig)  # chiudo la figura per liberare memoria
+ax.figure.savefig(output_dir / "convolved_spectrum_vs_fit.png", dpi=200, bbox_inches="tight")
+plt.close(fig)
 
 # Aggiungo il fondo
-expectation_bkg = bkg.expectation(copy=True)  # calcolo l'aspettazione del fondo atteso
+expectation_bkg = bkg.expectation(copy=True)
 
-fig, ax = plt.subplots()  # creo la figura per il confronto tra modello più fondo e conteggi totali
+fig, ax = plt.subplots()
 
-ax.stairs(expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(
-            copy=False).contents, binned_energy_edges, color='purple', label="Best fit convolved with response plus background")  # disegno la somma del modello convoluto e del fondo
+ax.stairs(expectation.project("Em").to_dense(copy=False).contents + expectation_bkg.project("Em").to_dense(
+            copy=False).contents, binned_energy_edges, color="purple", label="Best fit convolved with response plus background")
 ax.errorbar(binned_energy,
-            expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(
+            expectation.project("Em").to_dense(copy=False).contents + expectation_bkg.project("Em").to_dense(
             copy=False).contents, yerr=np.sqrt(
-            expectation.project('Em').to_dense(copy=False).contents + expectation_bkg.project('Em').to_dense(
-            copy=False).contents), color='purple', linewidth=0, elinewidth=1)  # aggiungo le barre d'errore sulla somma modello più fondo
-ax.stairs(data.data.project('Em').to_dense(copy=False).contents, binned_energy_edges, color='black', ls=":",
-            label="Total counts")  # disegno i conteggi totali osservati
-ax.errorbar(binned_energy, data.data.project('Em').to_dense(copy=False).contents,
-            yerr=np.sqrt(data.data.project('Em').to_dense(copy=False).contents), color='black', linewidth=0,
-            elinewidth=1)  # aggiungo le barre d'errore sui conteggi totali
+            expectation.project("Em").to_dense(copy=False).contents + expectation_bkg.project("Em").to_dense(
+            copy=False).contents), color="purple", linewidth=0, elinewidth=1)
+ax.stairs(data.data.project("Em").to_dense(copy=False).contents, binned_energy_edges, color="black", ls=":",
+            label="Total counts")
+ax.errorbar(binned_energy, data.data.project("Em").to_dense(copy=False).contents,
+            yerr=np.sqrt(data.data.project("Em").to_dense(copy=False).contents), color="black", linewidth=0,
+            elinewidth=1)
 
-ax.set_xscale("log")  # imposto la scala logaritmica sull'asse x
-ax.set_yscale("log")  # imposto la scala logaritmica sull'asse y
+ax.set_xscale("log")
+ax.set_yscale("log")
+ax.set_xlabel("Energy (keV)")
+ax.set_ylabel("Counts")
+ax.legend()
 
-ax.set_xlabel("Energy (keV)")  # imposto l'etichetta dell'asse delle energie
-ax.set_ylabel("Counts")  # imposto l'etichetta dell'asse dei conteggi
-
-ax.legend()  # mostro la legenda del grafico
-
-ax.figure.savefig(output_dir / "convolved_spectrum_vs_fit_with_background.png", dpi=200, bbox_inches="tight")  # salvo il grafico nella cartella delle figure
-plt.close(fig)  # chiudo la figura per liberare memoria
+ax.figure.savefig(output_dir / "convolved_spectrum_vs_fit_with_background.png", dpi=200, bbox_inches="tight")
+plt.close(fig)
 
 t_end = time.perf_counter()
 elapsed = t_end - t_start
