@@ -57,21 +57,15 @@ def psr_cache_file(l, b, sc_orientation_path, dr_path, yaml_path, nside):
     return CACHE_DIR / f"psr_l{l:.4f}_b{b:.4f}_{h.hexdigest()[:10]}.h5"
 
 
-def get_source_psr(response, name="source"):
-    """Restituisce la PSR per-sorgente (quella che contiene davvero il risultato)."""
-    return getattr(response, "_source_responses", {}).get(name)
-
-
-def save_psr(target, path):
+def save_psr(response, path, name="source"):
+    """Salva la PSR calcolata dalla copia per-sorgente creata dal folding."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    if target is None or target._psr is None:
+    sr = getattr(response, "_source_responses", {}).get(name)
+    if sr is None or sr._psr is None:
         print("PSR non ancora calcolata, niente da salvare")
         return False
     try:
-        target._psr.write(path, overwrite=True)
-        with open(Path(path).with_suffix(".meta.pkl"), "wb") as f:
-            pickle.dump({"skycoord": target._last_convolved_source_skycoord,
-                         "dict": target._last_convolved_source_dict}, f)
+        sr._psr.write(path, overwrite=True)
         print(f"PSR salvata in {path}")
         return True
     except Exception as e:
@@ -79,24 +73,30 @@ def save_psr(target, path):
         return False
 
 
-def load_psr(target, path):
+def load_psr(psr_template, path, point_source):
+    """
+    Fa in modo che ogni copia creata da psr_template.copy() parta con la PSR
+    già caricata e la coordinata della sorgente, così expectation() non la ricalcola.
+    """
     from cosipy.response import PointSourceResponse
-    meta_path = Path(path).with_suffix(".meta.pkl")
-    if not Path(path).exists() or not meta_path.exists():
+    if not Path(path).exists():
         return False
     try:
-        with open(meta_path, "rb") as f:
-            meta = pickle.load(f)
-        target._psr = PointSourceResponse.open(path)
-        target._last_convolved_source_skycoord = meta["skycoord"]
-        target._last_convolved_source_dict = meta["dict"]
+        loaded_psr = PointSourceResponse.open(path)
+        coord = point_source.position.sky_coord.copy()
+        original_copy = psr_template.copy
+
+        def cached_copy():
+            new = original_copy()
+            new._psr = loaded_psr
+            new._last_convolved_source_skycoord = coord.copy()
+            return new
+
+        psr_template.copy = cached_copy
         print(f"PSR caricata da {path}")
         return True
     except Exception as e:
         print("Caricamento PSR fallito, ricalcolo:", type(e).__name__, e)
-        target._psr = None
-        target._last_convolved_source_skycoord = None
-        target._last_convolved_source_dict = None
         return False
 
 def prepare_cosi_plugin(
@@ -205,9 +205,7 @@ cache_file = psr_cache_file(l, b, sc_orientation_path, dr_path, yaml_path,
                             nside=2 * data.axes['PsiChi'].nside)
 
 response.set_model(model)
-sr = get_source_psr(response)
-print("PSR per-sorgente disponibile dopo set_model:", sr is not None)
-loaded = load_psr(sr if sr is not None else psr, cache_file)
+loaded = load_psr(psr, cache_file, source)
 
 plugins = DataList(cosi)
 like = JointLikelihood(model, plugins, verbose=False)
@@ -217,7 +215,7 @@ results, like_df = like.fit()
 print(f"fit: {time.perf_counter()-t0:.1f}s")
 
 if not loaded:
-    save_psr(get_source_psr(response), cache_file)
+    save_psr(response, cache_file)
 print(results)
 print(like_df)
 
