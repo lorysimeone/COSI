@@ -188,7 +188,7 @@ source = PointSource("source",  # nome della sorgente (arbitrario, ma deve esser
                      l=l,  # Longitude (deg)
                      b=b,  # Latitude (deg)
                      spectral_shape=spectrum)  # Spectral model
-mmodel = Model(source)  # Modello a unica sorgente
+model = Model(source)  # Modello a unica sorgente
 
 cache_file = psr_cache_file(l, b, sc_orientation_path, dr_path, yaml_path,
                             nside=2 * data.axes['PsiChi'].nside)
