@@ -140,34 +140,6 @@ def prepare_cosi_plugin(
     # Passo la PSR di 3ML alla funzione che esegue la convoluzione con lo spettro
     response = BinnedThreeMLModelFolding(data=data, point_source_response=psr)
 
-    import inspect
-    import pickle
-
-    # Controllo la classe esatta e la gerarchia di ereditarietà di response
-    print("Tipo:", type(response))
-    print("MRO:", [cls.__name__ for cls in type(response).__mro__])
-
-    # Controllo attributi e metodi pubblici
-    public_attrs = [name for name in dir(response) if not name.startswith("_")]
-    print("Attributi/metodi pubblici:", public_attrs)
-
-    # Ispeziono la firma del costruttore e del metodo __init__
-    print("Signature __init__:", inspect.signature(type(response).__init__))
-
-    # Provo a verificare se response supporta la serializzazione con pickle
-    test_file = Path("test_response.pkl")
-    try:
-        with open(test_file, "wb") as f:
-            pickle.dump(response, f)
-        with open(test_file, "rb") as f:
-            reloaded = pickle.load(f)
-        print("Pickle riuscito! Tipo ricaricato:", type(reloaded))
-    except Exception as e:
-        print("Pickle non riuscito o problematico:", type(e).__name__, e)
-    finally:
-        if test_file.exists():
-            test_file.unlink()
-
     like_fun = PoissonLikelihood(data, response, bkg)  # la likelihood da usare
 
     # Creo il plugin di COSI
