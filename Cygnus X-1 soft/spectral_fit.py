@@ -2,13 +2,6 @@ import time
 
 t_start = time.perf_counter()
 
-import os
-from pathlib import Path
-
-_numba_cache_dir = Path("/tmp/numba_cache")  # definisco una directory scrivibile in /tmp per la cache di Numba
-_numba_cache_dir.mkdir(parents=True, exist_ok=True)  # creo la directory della cache se non esiste già
-os.environ.setdefault("NUMBA_CACHE_DIR", str(_numba_cache_dir))  # imposto NUMBA_CACHE_DIR prima di importare cosipy/threeML/numba
-
 import sys
 import pickle
 
