@@ -143,8 +143,8 @@ for bkg_label in bkg_dist.keys():
                                               )
 
 # Definisco il modello di sorgente puntiforme
-l = 184.56
-b = -5.78
+l = 71.33496
+b = 3.066917
 
 alpha = -1.99
 beta = -2.32
