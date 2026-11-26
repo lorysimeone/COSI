@@ -20,9 +20,10 @@ from threeML import PointSource, Model
 
 logging.basicConfig(level=logging.INFO)  # attivo i log informativi durante download, binning e preparazione
 
-CACHE_PSR_DIR = Path("cache_psr")
-CACHE_BKG_DIR = Path("cache_bkg")
-CACHE_SC_DIR = Path("cache_sc")
+CACHE_ROOT_DIR = Path("/home/lorysimeone/COSI")
+CACHE_PSR_DIR = CACHE_ROOT_DIR / "cache_psr"
+CACHE_BKG_DIR = CACHE_ROOT_DIR / "cache_bkg"
+CACHE_SC_DIR = CACHE_ROOT_DIR / "cache_sc"
 
 
 def _file_stamp(path: Path) -> str:

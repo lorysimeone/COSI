@@ -49,10 +49,11 @@ import matplotlib.pyplot as plt
 from threeML import PointSource, Model, JointLikelihood, DataList
 from astromodels import Parameter
 
-CACHE_PSR_DIR = Path("cache_psr")
-CACHE_BKG_DIR = Path("cache_bkg")
-CACHE_SC_DIR = Path("cache_sc")
-CACHE_FIT_DIR = Path("cache_fit")
+CACHE_ROOT_DIR = Path("/home/lorysimeone/COSI")
+CACHE_PSR_DIR = CACHE_ROOT_DIR / "cache_psr"
+CACHE_BKG_DIR = CACHE_ROOT_DIR / "cache_bkg"
+CACHE_SC_DIR = CACHE_ROOT_DIR / "cache_sc"
+CACHE_FIT_DIR = CACHE_ROOT_DIR / "cache_fit"
 
 
 def _file_stamp(path: Path) -> str:
