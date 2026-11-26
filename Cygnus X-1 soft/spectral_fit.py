@@ -1,6 +1,18 @@
 import time
 
 t_start = time.perf_counter()
+_last_mark = t_start
+
+
+def log_step(step_name: str) -> None:
+    # Misuro il tempo trascorso dall'ultimo blocco completato e aggiorno il marcatore temporale
+    global _last_mark
+    now = time.perf_counter()
+    delta = now - _last_mark
+    total = now - t_start
+    print(f"[TIMER] {step_name}: {delta:.2f}s (totale: {total:.2f}s)")
+    _last_mark = now
+
 
 import sys
 import pickle
@@ -169,6 +181,7 @@ cosi, response, bkg, source_binned, data, psr = prepare_cosi_plugin(
     bkg_data_path=bkg_data_path,
     dr_path=dr_path,
 )
+log_step("Preparazione plugin, dati e risposta strumentale")
 
 # Definisco il modello di sorgente puntiforme
 l = 71.33496
@@ -188,9 +201,11 @@ psr_cache = get_cached_psr_path(
 
 response.set_model(model)
 attach_cached_psr(psr, psr_cache, point_source)
+log_step("Caricamento PSR da cache e collegamento modello")
 
 like = JointLikelihood(model, DataList(cosi), verbose=False)
 results, like_df = like.fit()
+log_step("Fit statistico (like.fit)")
 print(results)
 print(like_df)
 
@@ -215,6 +230,7 @@ for i, e in enumerate(energy):
     flux = results_err(e)
     flux_median[i] = flux.median
     flux_lo[i], flux_hi[i] = flux.equal_tail_interval(cl=0.68)
+log_step("Propagazione errori e intervalli al 68%")
 
 # Plotto lo spettro fittato con i punti del file .dat
 fig, ax = plt.subplots()
@@ -276,6 +292,7 @@ output_dir = Path("spectra_figures")
 output_dir.mkdir(parents=True, exist_ok=True)
 ax.figure.savefig(output_dir / "fitted_spectrum_power_law.png", dpi=200, bbox_inches="tight")
 plt.close(fig)
+log_step("Plot spettro fittato (fitted_spectrum_power_law.png)")
 
 # Plotto lo spettro convoluto con la risposta e i conteggi della sorgente
 binned_energy_edges = source_binned.binned_data.axes["Em"].edges.value
@@ -303,6 +320,7 @@ ax.set_ylabel("Counts")
 _ = ax.legend()
 ax.figure.savefig(output_dir / "convolved_spectrum_vs_fit.png", dpi=200, bbox_inches="tight")
 plt.close(fig)
+log_step("Plot spettro convoluto vs sorgente (convolved_spectrum_vs_fit.png)")
 
 # Plotto lo spettro convoluto più il fondo contro i conteggi totali
 expectation_bkg = bkg.expectation(copy=True)
@@ -320,15 +338,3 @@ ax.stairs(data.data.project("Em").to_dense(copy=False).contents, binned_energy_e
 ax.errorbar(binned_energy, data.data.project("Em").to_dense(copy=False).contents,
             yerr=np.sqrt(data.data.project("Em").to_dense(copy=False).contents), color="black", linewidth=0,
             elinewidth=1)
-
-ax.set_xscale("log")
-ax.set_yscale("log")
-ax.set_xlabel("Energy (keV)")
-ax.set_ylabel("Counts")
-ax.legend()
-ax.figure.savefig(output_dir / "convolved_spectrum_vs_fit_with_background.png", dpi=200, bbox_inches="tight")
-plt.close(fig)
-
-elapsed = time.perf_counter() - t_start
-minutes, seconds = divmod(elapsed, 60)
-print(f"Tempo totale di esecuzione: {int(minutes)}m {seconds:.2f}s ({elapsed:.2f}s)")
