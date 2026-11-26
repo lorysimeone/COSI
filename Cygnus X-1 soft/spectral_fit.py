@@ -368,8 +368,8 @@ ax.scatter(dat_energies, dat_energies**2 * dat_fluxes, color="black", s=6, zorde
 fit_label = (
     f"Best fit\n"
     f"K = {k_val:.2e} ± {k_err:.2e} (at {break_val:g} keV)\n"
-    f"index_1 = {idx1_val:.2f} ± {idx1_err:.2f}\n"
-    f"index_2 = {idx2_val:.2f} ± {idx2_err:.2f}"
+    f"\u0393_1 = {idx1_val:.2f} ± {idx1_err:.2f}\n"
+    f"\u0393_2 = {idx2_val:.2f} ± {idx2_err:.2f}"
 )
 
 ax.plot(energy, energy**2 * flux_median, label=fit_label)
