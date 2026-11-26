@@ -298,6 +298,34 @@ else:
     results_err = results.propagate(results.optimized_model["source"].spectrum.main.shape.evaluate_at, **parameters)
     print(results.optimized_model["source"])
 
+    else:
+    # Eseguo il fit statistico e la propagazione dell'errore per questa configurazione
+    like = JointLikelihood(model, DataList(cosi), verbose=False)
+    results, like_df = like.fit()
+    log_step("Fit statistico (like.fit)")
+    print(results)
+    print(like_df)
+
+    results = like.results
+    print(results.display())
+
+    parameters = {
+        par.name: results.get_variates(par.path)
+        for par in results.optimized_model["source"].parameters.values()
+        if par.free
+    }
+    results_err = results.propagate(results.optimized_model["source"].spectrum.main.shape.evaluate_at, **parameters)
+    print(results.optimized_model["source"])
+
+    # Verifico unità, limiti e valore ottimizzato del parametro K
+    k_par = results.optimized_model["source"].spectrum.main.shape.K
+    print("K value:", k_par.value, "| unit:", k_par.unit, "| min/max:", k_par.min_value, k_par.max_value)
+
+    # Controllo il flusso differenziale propagato a 100 keV e il flusso integrato in banda COSI
+    flux_100 = results_err(100.0)
+    print("dN/dE(100 keV) median / 68% CI:", flux_100.median, flux_100.equal_tail_interval(cl=0.68))
+    print("Integrated flux (100 keV - 10 MeV):", results.get_flux(100 * u.keV, 10 * u.MeV))[cite: 3]
+
     # Calcolo lo spettro fittato e la banda d'errore al 68%
     flux_lo = np.zeros_like(energy)
     flux_median = np.zeros_like(energy)
