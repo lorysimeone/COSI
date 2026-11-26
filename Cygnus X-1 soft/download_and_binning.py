@@ -8,13 +8,19 @@ import hashlib
 import logging
 from pathlib import Path
 
+import astropy.units as u
 from cosipy import BinnedData
 from cosipy.spacecraftfile import SpacecraftHistory
+from cosipy.response.FullDetectorResponse import FullDetectorResponse
+from cosipy.response import BinnedInstrumentResponse, BinnedThreeMLPointSourceResponse
+from cosipy.data_io import EmCDSBinnedData
 from cosipy.util import fetch_wasabi_file
 from histpy import Histogram
+from threeML import PointSource
 
 logging.basicConfig(level=logging.INFO)  # attivo i log informativi durante download, binning e preparazione
 
+CACHE_PSR_DIR = Path("cache_psr")
 CACHE_BKG_DIR = Path("cache_bkg")
 CACHE_SC_DIR = Path("cache_sc")
 
@@ -39,6 +45,17 @@ def sc_cache_file(sc_orientation_path: Path) -> Path:
     h = hashlib.sha1()
     h.update(_file_stamp(sc_orientation_path).encode())
     return CACHE_SC_DIR / f"sc_history_{h.hexdigest()[:10]}.pkl"
+
+
+def psr_cache_file(l, b, sc_orientation_path, dr_path, yaml_path, nside) -> Path:
+    # Calcolo un hash univoco in base a coordinate, nside e timestamp dei file di input
+    h = hashlib.sha1()
+    for p in (sc_orientation_path, dr_path, yaml_path):
+        p = Path(p)
+        h.update(str(p.resolve()).encode())
+        h.update(str(p.stat().st_mtime_ns).encode())
+    h.update(f"{l:.6f}_{b:.6f}_{nside}".encode())
+    return CACHE_PSR_DIR / f"psr_l{l:.4f}_b{b:.4f}_{h.hexdigest()[:10]}.h5"
 
 
 def load_or_build_sc_history(sc_orientation_path: Path) -> SpacecraftHistory:
@@ -88,12 +105,57 @@ def load_or_build_total_bkg(bkg_data_path: Path, yaml_path: Path, axes=("Em", "P
     return total_bkg
 
 
+def build_and_cache_psr(
+    l: float,
+    b: float,
+    sc_orientation: SpacecraftHistory,
+    source_binned: BinnedData,
+    total_bkg,
+    sc_orientation_path: Path,
+    dr_path: Path,
+    yaml_path: Path,
+):
+    # Preparo l'interfaccia dati e la risposta strumentale per calcolare e mettere in cache la PSR
+    bkg_with_eps = total_bkg + sys.float_info.min
+    data = EmCDSBinnedData(source_binned.binned_data.project("Em", "Phi", "PsiChi") + bkg_with_eps)
+    nside = 2 * data.axes["PsiChi"].nside
+    cache_path = psr_cache_file(l, b, sc_orientation_path, dr_path, yaml_path, nside=nside)
+
+    if cache_path.exists():
+        print(f"PSR già presente in cache: {cache_path}")
+        return cache_path
+
+    dr = FullDetectorResponse.open(str(dr_path))
+    instrument_response = BinnedInstrumentResponse(dr, data)
+    psr_builder = BinnedThreeMLPointSourceResponse(
+        data=data,
+        instrument_response=instrument_response,
+        sc_history=sc_orientation,
+        energy_axis=dr.axes["Ei"],
+        polarization_axis=dr.axes["Pol"] if "Pol" in dr.axes.labels else None,
+        nside=nside,
+    )
+    point_source = PointSource("source", l=l, b=b)
+    psr_instance = psr_builder.copy()
+    psr_instance.set_source(point_source)
+
+    try:
+        CACHE_PSR_DIR.mkdir(parents=True, exist_ok=True)
+        psr_instance._psr.write(cache_path, overwrite=True)
+        print(f"PSR salvata in {cache_path}")
+    except Exception as e:
+        print("Salvataggio cache PSR fallito:", type(e).__name__, e)
+    return cache_path
+
+
 data_path_ori_bkg = Path("/heronas/simeone/COSI/ori_bkg_yaml")
 data_path_cygnus_soft = Path("/heronas/simeone/COSI/Cygnus X-1 soft")
 
 sc_orientation_path = data_path_ori_bkg / "DC4_final_530km_3_month_with_slew_1sbins_GalacticEarth_SAA.fits"
 yaml_path = data_path_ori_bkg / "DC4.yaml"
+source_data_path = data_path_cygnus_soft / "cygnus_soft_binned_data.hdf5"
 bkg_data_path = data_path_ori_bkg / "bkg_binned_data.hdf5"
+dr_path = data_path_ori_bkg / "ResponseContinuum.o3.e100_10000.b10log.s10396905069491.m2284.filtered.nonsparse.binnedimaging.imagingresponse.h5"
 
 # Scarico i dati non binnati della sorgente se non già presenti localmente
 unbinned_name = "cygX1_soft_3months_unbinned_data_filtered_with_SAAcut.fits.gz"
@@ -115,8 +177,25 @@ else:
     print(f"Dati binnati già presenti in {binned_output_hdf5}, salto il binning")
 
 # Preparo e metto in cache la storia del satellite e l'istogramma proiettato del fondo
-_ = load_or_build_sc_history(sc_orientation_path)
-_ = load_or_build_total_bkg(bkg_data_path, yaml_path, axes=("Em", "Phi", "PsiChi"))
+sc_orientation = load_or_build_sc_history(sc_orientation_path)
+total_bkg = load_or_build_total_bkg(bkg_data_path, yaml_path, axes=("Em", "Phi", "PsiChi"))
+
+# Carico i dati binnati della sorgente e pre-calcolo la PSR per le coordinate della sorgente
+source_binned = BinnedData(yaml_path)
+source_binned.load_binned_data_from_hdf5(binned_data=source_data_path)
+
+l = 71.33496
+b = 3.066917
+_ = build_and_cache_psr(
+    l=l,
+    b=b,
+    sc_orientation=sc_orientation,
+    source_binned=source_binned,
+    total_bkg=total_bkg,
+    sc_orientation_path=sc_orientation_path,
+    dr_path=dr_path,
+    yaml_path=yaml_path,
+)
 
 elapsed = time.perf_counter() - t_start
 minutes, seconds = divmod(elapsed, 60)
