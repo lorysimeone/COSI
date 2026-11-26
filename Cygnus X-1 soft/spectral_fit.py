@@ -17,6 +17,7 @@ def log_step(step_name: str) -> None:
 import sys
 import pickle
 import hashlib
+import inspect
 import logging
 from pathlib import Path
 import sys as _sys
@@ -51,12 +52,29 @@ from astromodels import Parameter
 CACHE_PSR_DIR = Path("cache_psr")
 CACHE_BKG_DIR = Path("cache_bkg")
 CACHE_SC_DIR = Path("cache_sc")
+CACHE_FIT_DIR = Path("cache_fit")
 
 
 def _file_stamp(path: Path) -> str:
     # Recupero percorso assoluto e timestamp di modifica per individuare il file in cache
     p = Path(path).resolve()
     return f"{p}:{p.stat().st_mtime_ns}"
+
+
+def _fit_model_fingerprint(fit_fn) -> str:
+    # Estraggo il codice sorgente della funzione di fit e, se disponibile, il timestamp del suo file
+    parts = [f"{getattr(fit_fn, '__module__', '')}.{getattr(fit_fn, '__qualname__', str(fit_fn))}"]
+    try:
+        parts.append(inspect.getsource(fit_fn))
+    except Exception:
+        pass
+    try:
+        src_file = inspect.getsourcefile(fit_fn)
+        if src_file:
+            parts.append(_file_stamp(Path(src_file)))
+    except Exception:
+        pass
+    return "\n".join(parts)
 
 
 def get_cached_sc_path(sc_orientation_path: Path) -> Path:
@@ -83,6 +101,27 @@ def get_cached_psr_path(l: float, b: float, sc_orientation_path: Path, dr_path: 
         h.update(str(p.stat().st_mtime_ns).encode())
     h.update(f"{l:.6f}_{b:.6f}_{nside}".encode())
     return CACHE_PSR_DIR / f"psr_l{l:.4f}_b{b:.4f}_{h.hexdigest()[:10]}.h5"
+
+
+def get_cached_fit_path(
+    fit_fn,
+    l: float,
+    b: float,
+    nside: int,
+    sc_orientation_path: Path,
+    yaml_path: Path,
+    source_data_path: Path,
+    bkg_data_path: Path,
+    dr_path: Path,
+) -> Path:
+    # Calcolo un hash univoco includendo funzione di fit, coordinate, binning e timestamp dei file di input
+    h = hashlib.sha1()
+    h.update(_fit_model_fingerprint(fit_fn).encode())
+    h.update(f"l={l:.8f};b={b:.8f};nside={nside}".encode())
+    for p in (sc_orientation_path, yaml_path, source_data_path, bkg_data_path, dr_path):
+        h.update(_file_stamp(p).encode())
+    fn_name = getattr(fit_fn, "__name__", "fit_fn")
+    return CACHE_FIT_DIR / f"fit_{fn_name}_{h.hexdigest()[:12]}.pkl"
 
 
 def attach_cached_psr(psr_template, cache_path: Path, point_source: PointSource):
@@ -186,51 +225,119 @@ log_step("Preparazione plugin, dati e risposta strumentale")
 # Definisco il modello di sorgente puntiforme
 l = 71.33496
 b = 3.066917
+fit_fn = power_model
 
-point_source = PointSource("source", l=l, b=b, spectral_shape=power_model())
+point_source = PointSource("source", l=l, b=b, spectral_shape=fit_fn())
 model = Model(point_source)
 
+nside = 2 * data.axes["PsiChi"].nside
 psr_cache = get_cached_psr_path(
     l=l,
     b=b,
     sc_orientation_path=sc_orientation_path,
     dr_path=dr_path,
     yaml_path=yaml_path,
-    nside=2 * data.axes["PsiChi"].nside,
+    nside=nside,
 )
 
 response.set_model(model)
 attach_cached_psr(psr, psr_cache, point_source)
 log_step("Caricamento PSR da cache e collegamento modello")
 
-like = JointLikelihood(model, DataList(cosi), verbose=False)
-results, like_df = like.fit()
-log_step("Fit statistico (like.fit)")
-print(results)
-print(like_df)
+fit_cache_path = get_cached_fit_path(
+    fit_fn=fit_fn,
+    l=l,
+    b=b,
+    nside=nside,
+    sc_orientation_path=sc_orientation_path,
+    yaml_path=yaml_path,
+    source_data_path=source_data_path,
+    bkg_data_path=bkg_data_path,
+    dr_path=dr_path,
+)
 
-results = like.results
-print(results.display())
-
-parameters = {
-    par.name: results.get_variates(par.path)
-    for par in results.optimized_model["source"].parameters.values()
-    if par.free
-}
-results_err = results.propagate(results.optimized_model["source"].spectrum.main.shape.evaluate_at, **parameters)
-print(results.optimized_model["source"])
-
-# Calcolo lo spettro fittato e la banda d'errore al 68%
 energy = np.geomspace(100 * u.keV, 10 * u.MeV).to_value(u.keV)
-flux_lo = np.zeros_like(energy)
-flux_median = np.zeros_like(energy)
-flux_hi = np.zeros_like(energy)
 
-for i, e in enumerate(energy):
-    flux = results_err(e)
-    flux_median[i] = flux.median
-    flux_lo[i], flux_hi[i] = flux.equal_tail_interval(cl=0.68)
-log_step("Propagazione errori e intervalli al 68%")
+if fit_cache_path.exists():
+    # Carico direttamente i risultati del fit e la banda d'errore salvati in cache
+    with open(fit_cache_path, "rb") as f:
+        fit_payload = pickle.load(f)
+    print(f"Risultato del fit caricato da {fit_cache_path} (salto like.fit e propagazione errori)")
+
+    energy = fit_payload["energy"]
+    flux_median = fit_payload["flux_median"]
+    flux_lo = fit_payload["flux_lo"]
+    flux_hi = fit_payload["flux_hi"]
+    k_val = fit_payload["k_val"]
+    k_err = fit_payload["k_err"]
+    idx_val = fit_payload["idx_val"]
+    idx_err = fit_payload["idx_err"]
+    piv_val = fit_payload["piv_val"]
+    exp_em = fit_payload["exp_em"]
+    exp_bkg_em = fit_payload["exp_bkg_em"]
+    log_step("Caricamento fit ed errori da cache")
+else:
+    # Eseguo il fit statistico e la propagazione dell'errore per questa configurazione
+    like = JointLikelihood(model, DataList(cosi), verbose=False)
+    results, like_df = like.fit()
+    log_step("Fit statistico (like.fit)")
+    print(results)
+    print(like_df)
+
+    results = like.results
+    print(results.display())
+
+    parameters = {
+        par.name: results.get_variates(par.path)
+        for par in results.optimized_model["source"].parameters.values()
+        if par.free
+    }
+    results_err = results.propagate(results.optimized_model["source"].spectrum.main.shape.evaluate_at, **parameters)
+    print(results.optimized_model["source"])
+
+    # Calcolo lo spettro fittato e la banda d'errore al 68%
+    flux_lo = np.zeros_like(energy)
+    flux_median = np.zeros_like(energy)
+    flux_hi = np.zeros_like(energy)
+
+    for i, e in enumerate(energy):
+        flux = results_err(e)
+        flux_median[i] = flux.median
+        flux_lo[i], flux_hi[i] = flux.equal_tail_interval(cl=0.68)
+    log_step("Propagazione errori e intervalli al 68%")
+
+    spec_opt = results.optimized_model["source"].spectrum.main.shape
+    k_val = float(spec_opt.K.value)
+    idx_val = float(spec_opt.index.value)
+    piv_val = float(spec_opt.piv.value)
+    k_err = float(results.get_variates(spec_opt.K.path).std)
+    idx_err = float(results.get_variates(spec_opt.index.path).std)
+
+    expectation = response.expectation()
+    expectation_bkg = bkg.expectation(copy=True)
+    exp_em = np.asarray(expectation.project("Em").to_dense(copy=False).contents)
+    exp_bkg_em = np.asarray(expectation_bkg.project("Em").to_dense(copy=False).contents)
+
+    fit_payload = {
+        "energy": energy,
+        "flux_median": flux_median,
+        "flux_lo": flux_lo,
+        "flux_hi": flux_hi,
+        "k_val": k_val,
+        "k_err": k_err,
+        "idx_val": idx_val,
+        "idx_err": idx_err,
+        "piv_val": piv_val,
+        "exp_em": exp_em,
+        "exp_bkg_em": exp_bkg_em,
+    }
+    try:
+        CACHE_FIT_DIR.mkdir(parents=True, exist_ok=True)
+        with open(fit_cache_path, "wb") as f:
+            pickle.dump(fit_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+        print(f"Risultato del fit salvato in {fit_cache_path}")
+    except Exception as e:
+        print("Salvataggio cache fit fallito:", type(e).__name__, e)
 
 # Plotto lo spettro fittato con i punti del file .dat
 fig, ax = plt.subplots()
@@ -250,13 +357,6 @@ dat_energies = np.array(dat_energies)
 dat_fluxes = np.array(dat_fluxes)
 
 ax.scatter(dat_energies, dat_energies**2 * dat_fluxes, color="black", s=6, zorder=4, label="cygX1_soft_spec.dat")
-
-spec_opt = results.optimized_model["source"].spectrum.main.shape
-k_val = spec_opt.K.value
-idx_val = spec_opt.index.value
-piv_val = spec_opt.piv.value
-k_err = results.get_variates(spec_opt.K.path).std
-idx_err = results.get_variates(spec_opt.index.path).std
 
 fit_label = (
     f"Best fit\n"
@@ -299,19 +399,13 @@ binned_energy_edges = source_binned.binned_data.axes["Em"].edges.value
 binned_energy = 0.5 * (binned_energy_edges[:-1] + binned_energy_edges[1:])
 bin_sizes = np.diff(binned_energy_edges)
 
-expectation = response.expectation()
+src_em = source_binned.binned_data.project("Em").to_dense(copy=False).contents
 
 fig, ax = plt.subplots()
-ax.stairs(expectation.project("Em").to_dense(copy=False).contents, binned_energy_edges, color="purple",
-          label="Best fit convolved with response")
-ax.errorbar(binned_energy, expectation.project("Em").to_dense(copy=False).contents,
-            yerr=np.sqrt(expectation.project("Em").to_dense(copy=False).contents), color="purple", linewidth=0,
-            elinewidth=1)
-ax.stairs(source_binned.binned_data.project("Em").to_dense(copy=False).contents, binned_energy_edges, color="black", ls=":",
-          label="Source counts")
-ax.errorbar(binned_energy, source_binned.binned_data.project("Em").to_dense(copy=False).contents,
-            yerr=np.sqrt(source_binned.binned_data.project("Em").to_dense(copy=False).contents), color="black", linewidth=0,
-            elinewidth=1)
+ax.stairs(exp_em, binned_energy_edges, color="purple", label="Best fit convolved with response")
+ax.errorbar(binned_energy, exp_em, yerr=np.sqrt(exp_em), color="purple", linewidth=0, elinewidth=1)
+ax.stairs(src_em, binned_energy_edges, color="black", ls=":", label="Source counts")
+ax.errorbar(binned_energy, src_em, yerr=np.sqrt(src_em), color="black", linewidth=0, elinewidth=1)
 
 ax.set_xscale("log")
 ax.set_yscale("log")
@@ -323,18 +417,24 @@ plt.close(fig)
 log_step("Plot spettro convoluto vs sorgente (convolved_spectrum_vs_fit.png)")
 
 # Plotto lo spettro convoluto più il fondo contro i conteggi totali
-expectation_bkg = bkg.expectation(copy=True)
+tot_em = data.data.project("Em").to_dense(copy=False).contents
+total_model_em = exp_em + exp_bkg_em
 
 fig, ax = plt.subplots()
-ax.stairs(expectation.project("Em").to_dense(copy=False).contents + expectation_bkg.project("Em").to_dense(
-            copy=False).contents, binned_energy_edges, color="purple", label="Best fit convolved with response plus background")
-ax.errorbar(binned_energy,
-            expectation.project("Em").to_dense(copy=False).contents + expectation_bkg.project("Em").to_dense(
-            copy=False).contents, yerr=np.sqrt(
-            expectation.project("Em").to_dense(copy=False).contents + expectation_bkg.project("Em").to_dense(
-            copy=False).contents), color="purple", linewidth=0, elinewidth=1)
-ax.stairs(data.data.project("Em").to_dense(copy=False).contents, binned_energy_edges, color="black", ls=":",
-            label="Total counts")
-ax.errorbar(binned_energy, data.data.project("Em").to_dense(copy=False).contents,
-            yerr=np.sqrt(data.data.project("Em").to_dense(copy=False).contents), color="black", linewidth=0,
-            elinewidth=1)
+ax.stairs(total_model_em, binned_energy_edges, color="purple", label="Best fit convolved with response plus background")
+ax.errorbar(binned_energy, total_model_em, yerr=np.sqrt(total_model_em), color="purple", linewidth=0, elinewidth=1)
+ax.stairs(tot_em, binned_energy_edges, color="black", ls=":", label="Total counts")
+ax.errorbar(binned_energy, tot_em, yerr=np.sqrt(tot_em), color="black", linewidth=0, elinewidth=1)
+
+ax.set_xscale("log")
+ax.set_yscale("log")
+ax.set_xlabel("Energy (keV)")
+ax.set_ylabel("Counts")
+ax.legend()
+ax.figure.savefig(output_dir / "convolved_spectrum_vs_fit_with_background.png", dpi=200, bbox_inches="tight")
+plt.close(fig)
+log_step("Plot spettro convoluto + fondo vs totali (convolved_spectrum_vs_fit_with_background.png)")
+
+elapsed = time.perf_counter() - t_start
+minutes, seconds = divmod(elapsed, 60)
+print(f"Tempo totale di esecuzione: {int(minutes)}m {seconds:.2f}s ({elapsed:.2f}s)")
