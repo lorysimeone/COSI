@@ -372,8 +372,8 @@ fit_label = (
     f"\u0393_2 = {idx2_val:.2f} ± {idx2_err:.2f}"
 )
 
-ax.plot(energy, energy**2 * flux_median, color="cyan", label=fit_label)
-ax.fill_between(energy, energy**2 * flux_lo, energy**2 * flux_hi, alpha=0.5, color="cyan", label="Best fit (errors)")
+ax.plot(energy, energy**2 * flux_median, color="royalblue", label=fit_label)
+ax.fill_between(energy, energy**2 * flux_lo, energy**2 * flux_hi, alpha=0.25, color="cyan", label="Best fit (errors)")
 
 ax.set_xscale("log")
 ax.set_yscale("log")
