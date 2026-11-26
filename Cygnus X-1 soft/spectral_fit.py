@@ -26,7 +26,7 @@ _fit_function_dir = Path("/heronas/simeone/COSI/Cygnus X-1 soft/model")
 if str(_fit_function_dir) not in _sys.path:
     _sys.path.insert(0, str(_fit_function_dir))
 
-from fit_function import power_model
+from fit_function import broken_power_model
 
 logging.basicConfig(level=logging.INFO)  # attivo i log informativi durante l'esecuzione
 
@@ -226,7 +226,7 @@ log_step("Preparazione plugin, dati e risposta strumentale")
 # Definisco il modello di sorgente puntiforme
 l = 71.33496
 b = 3.066917
-fit_fn = power_model
+fit_fn = broken_power_model
 
 point_source = PointSource("source", l=l, b=b, spectral_shape=fit_fn())
 model = Model(point_source)
@@ -271,9 +271,11 @@ if fit_cache_path.exists():
     flux_hi = fit_payload["flux_hi"]
     k_val = fit_payload["k_val"]
     k_err = fit_payload["k_err"]
-    idx_val = fit_payload["idx_val"]
-    idx_err = fit_payload["idx_err"]
-    piv_val = fit_payload["piv_val"]
+    idx1_val = fit_payload["idx1_val"]
+    idx1_err = fit_payload["idx1_err"]
+    idx2_val = fit_payload["idx2_val"]
+    idx2_err = fit_payload["idx2_err"]
+    break_val = fit_payload["break_val"]
     exp_em = fit_payload["exp_em"]
     exp_bkg_em = fit_payload["exp_bkg_em"]
     log_step("Caricamento fit ed errori da cache")
@@ -309,10 +311,12 @@ else:
 
     spec_opt = results.optimized_model["source"].spectrum.main.shape
     k_val = float(spec_opt.K.value)
-    idx_val = float(spec_opt.index.value)
-    piv_val = float(spec_opt.piv.value)
+    idx1_val = float(spec_opt.index_1.value)
+    idx2_val = float(spec_opt.index_2.value)
+    break_val = float(spec_opt.break_energy.value)
     k_err = float(results.get_variates(spec_opt.K.path).std)
-    idx_err = float(results.get_variates(spec_opt.index.path).std)
+    idx1_err = float(results.get_variates(spec_opt.index_1.path).std)
+    idx2_err = float(results.get_variates(spec_opt.index_2.path).std)
 
     expectation = response.expectation()
     expectation_bkg = bkg.expectation(copy=True)
@@ -326,9 +330,11 @@ else:
         "flux_hi": flux_hi,
         "k_val": k_val,
         "k_err": k_err,
-        "idx_val": idx_val,
-        "idx_err": idx_err,
-        "piv_val": piv_val,
+        "idx1_val": idx1_val,
+        "idx1_err": idx1_err,
+        "idx2_val": idx2_val,
+        "idx2_err": idx2_err,
+        "break_val": break_val,
         "exp_em": exp_em,
         "exp_bkg_em": exp_bkg_em,
     }
@@ -361,8 +367,9 @@ ax.scatter(dat_energies, dat_energies**2 * dat_fluxes, color="black", s=6, zorde
 
 fit_label = (
     f"Best fit\n"
-    f"K = {k_val:.2e} ± {k_err:.2e} (at {piv_val:g} keV)\n"
-    f"index = {idx_val:.2f} ± {idx_err:.2f}"
+    f"K = {k_val:.2e} ± {k_err:.2e} (at {break_val:g} keV)\n"
+    f"index_1 = {idx1_val:.2f} ± {idx1_err:.2f}\n"
+    f"index_2 = {idx2_val:.2f} ± {idx2_err:.2f}"
 )
 
 ax.plot(energy, energy**2 * flux_median, label=fit_label)

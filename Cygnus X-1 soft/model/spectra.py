@@ -4,7 +4,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 from pathlib import Path
-from fit_function import crea_modello_spettrale
+from fit_function import power_model
 
 def trova_file(nome, radici):
     """Cerca `nome` in ciascuna radice (e nelle sue sottocartelle), nell'ordine dato."""
@@ -48,7 +48,7 @@ energy = np.array(energy)
 dnde = np.array(dnde)
 
 # NUOVO: creo il modello spettrale e lo valuto su una griglia di energie in keV
-spectrum = crea_modello_spettrale()       # usa i valori di default: index=-2.0, K=8.6e-5 a 100 keV
+spectrum = power_model()       # usa i valori di default: index=-2.0, K=8.6e-5 a 100 keV
 e_grid = np.geomspace(80, 12500, 200)     # keV, stesso intervallo dell'asse x del grafico
 model_dnde = spectrum(e_grid)             # dN/dE in ph cm^-2 s^-1 keV^-1
 
@@ -70,7 +70,7 @@ ax.plot(energy, energy * energy * dnde, color="black", ls=":", lw=2.2, label="In
 
 # NUOVO: il modello della funzione (valori iniziali del fit)
 model_label = (f"Initial model\nK = {spectrum.K.value:.2e} (at {spectrum.piv.value:g} keV)\n"
-               f"index = {spectrum.index.value:.2f}")
+               f"\u0393 = {spectrum.index.value:.2f}")
 ax.plot(e_grid, e_grid * e_grid * model_dnde, color="tab:red", lw=1.8, label=model_label)
 
 ax.set_xscale("log")
