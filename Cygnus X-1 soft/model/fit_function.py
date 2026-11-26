@@ -27,8 +27,8 @@ def power_model(index=-2.7, piv=100.0 * u.keV, K=8.6e-5 / u.cm / u.cm / u.s / u.
 def broken_power_model(
     index_1=-2.65,
     index_2=-2.75,
-    break_energy=100.0 * u.keV,
-    K=8.6e-5 / u.cm / u.cm / u.s / u.keV,
+    break_energy=1000.0 * u.keV,
+    K=2.7e-6 / u.cm / u.cm / u.s / u.keV,
 ):
     spectrum = Broken_powerlaw()  # creo il modello spettrale a legge di potenza spezzata non smooth
 
@@ -39,6 +39,10 @@ def broken_power_model(
     spectrum.beta.min_value = -6.0  # imposto il limite inferiore per il secondo indice spettrale
     spectrum.beta.max_value = 2.0  # imposto il limite superiore per il secondo indice spettrale
     spectrum.beta.delta = 0.05  # imposto il passo iniziale per il secondo indice spettrale
+
+    spectrum.xb.min_value = 100.0  # imposto il limite inferiore per l'energia di break (keV, inizio del range dei dati)
+    spectrum.xb.max_value = 10000.0  # imposto il limite superiore per l'energia di break (keV, fine del range dei dati)
+    spectrum.xb.delta = 50.0  # imposto il passo iniziale per l'energia di break
 
     spectrum.K.value = K.value  # imposto il valore iniziale della normalizzazione
     spectrum.xb.value = break_energy.value  # imposto l'energia di break iniziale
@@ -51,6 +55,6 @@ def broken_power_model(
     spectrum.K.free = True  # lascio libera la normalizzazione durante il fit
     spectrum.alpha.free = True  # lascio libero il primo indice spettrale durante il fit
     spectrum.beta.free = True  # lascio libero il secondo indice spettrale durante il fit
-    spectrum.xb.free = False  # tengo fissa l'energia di break
+    spectrum.xb.free = True  # lascio libera l'energia di break durante il fit
 
     return spectrum  # restituisco il modello spettrale configurato

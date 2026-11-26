@@ -283,6 +283,7 @@ if fit_cache_path.exists():
     idx2_val = fit_payload["idx2_val"]
     idx2_err = fit_payload["idx2_err"]
     break_val = fit_payload["break_val"]
+    break_err = fit_payload.get("break_err", float("nan"))
     exp_em = fit_payload["exp_em"]
     exp_bkg_em = fit_payload["exp_bkg_em"]
     log_step("Caricamento fit ed errori da cache")
@@ -324,6 +325,7 @@ else:
     k_err = float(results.get_variates(spec_opt.K.path).std)
     idx1_err = float(results.get_variates(spec_opt.alpha.path).std)
     idx2_err = float(results.get_variates(spec_opt.beta.path).std)
+    break_err = float(results.get_variates(spec_opt.xb.path).std)
 
     # Valuto il flusso differenziale propagato all'energia di riferimento (break_val)
     flux_ref = results_err(break_val)
@@ -361,6 +363,7 @@ else:
         "idx2_val": idx2_val,
         "idx2_err": idx2_err,
         "break_val": break_val,
+        "break_err": break_err,
         "exp_em": exp_em,
         "exp_bkg_em": exp_bkg_em,
     }
@@ -400,10 +403,11 @@ int_flux_line = (
 fit_label = (
     f"Best fit\n"
     f"dN/dE = {flux_ref_val:.2e} ± {flux_ref_sym_err:.2e} ph/(cm² s keV) (at {break_val:g} keV)\n"
-    f"K_param = {k_val:.2e} ± {k_err:.2e}\n"
+    f"K = {k_val:.2e} ± {k_err:.2e}\n"
     f"{int_flux_line}"
     f"\u0393_1 = {idx1_val:.2f} ± {idx1_err:.2f}\n"
-    f"\u0393_2 = {idx2_val:.2f} ± {idx2_err:.2f}"
+    f"\u0393_2 = {idx2_val:.2f} ± {idx2_err:.2f}\n"
+    f"E_b = {break_val:.0f} ± {break_err:.0f} keV"
 )
 
 ax.plot(energy, energy**2 * flux_median, color="royalblue", label=fit_label)
@@ -479,4 +483,4 @@ log_step("Plot spettro convoluto + fondo vs totali (convolved_spectrum_vs_fit_wi
 
 elapsed = time.perf_counter() - t_start
 minutes, seconds = divmod(elapsed, 60)
-print(f"Tempo totale di esecuzione: {int(minutes)}m {seconds:.2f}s ({elapsed:.2f}s)")
+print(f"Tempo totale di esecuzione: {int(minutes)}m {seconds:.2f}s ({elapsed:.2f}s)")
