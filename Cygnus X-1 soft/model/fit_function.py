@@ -27,8 +27,8 @@ def power_model(index=-2.7, piv=100.0 * u.keV, K=8.6e-5 / u.cm / u.cm / u.s / u.
 def broken_power_model(
     index_1=-2.65,
     index_2=-2.75,
-    break_energy=350.0 * u.keV,
-    K=1.7e-6 / u.cm / u.cm / u.s / u.keV,
+    break_energy=100.0 * u.keV,
+    K=8.6e-5 / u.cm / u.cm / u.s / u.keV,
 ):
     spectrum = Broken_powerlaw()  # creo il modello spettrale a legge di potenza spezzata non smooth
 
