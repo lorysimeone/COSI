@@ -8,15 +8,15 @@ import hashlib
 import logging
 from pathlib import Path
 
-import astropy.units as u
-from astropy.coordinates import SkyCoord
+from astromodels import Powerlaw
 from cosipy import BinnedData
 from cosipy.spacecraftfile import SpacecraftHistory
 from cosipy.response.FullDetectorResponse import FullDetectorResponse
-from cosipy.response import BinnedInstrumentResponse, BinnedThreeMLPointSourceResponse
+from cosipy.response import BinnedInstrumentResponse, BinnedThreeMLPointSourceResponse, BinnedThreeMLModelFolding
 from cosipy.data_io import EmCDSBinnedData
 from cosipy.util import fetch_wasabi_file
 from histpy import Histogram
+from threeML import PointSource, Model
 
 logging.basicConfig(level=logging.INFO)  # attivo i log informativi durante download, binning e preparazione
 
@@ -135,13 +135,19 @@ def build_and_cache_psr(
         polarization_axis=dr.axes["Pol"] if "Pol" in dr.axes.labels else None,
         nside=nside,
     )
-    coord = SkyCoord(l=l * u.deg, b=b * u.deg, frame="galactic")
-    psr_instance = psr_builder.copy()
-    psr_instance.convolve_source_skycoord(coord)
+    response = BinnedThreeMLModelFolding(data=data, point_source_response=psr_builder)
+    temp_source = PointSource("source", l=l, b=b, spectral_shape=Powerlaw())
+    response.set_model(Model(temp_source))
+    _ = response.expectation()
+
+    sr = getattr(response, "_source_responses", {}).get("source")
+    if sr is None or sr._psr is None:
+        print("PSR non calcolata durante la pre-elaborazione, salto il salvataggio")
+        return cache_path
 
     try:
         CACHE_PSR_DIR.mkdir(parents=True, exist_ok=True)
-        psr_instance._psr.write(cache_path, overwrite=True)
+        sr._psr.write(cache_path, overwrite=True)
         print(f"PSR salvata in {cache_path}")
     except Exception as e:
         print("Salvataggio cache PSR fallito:", type(e).__name__, e)
