@@ -298,25 +298,6 @@ else:
     results_err = results.propagate(results.optimized_model["source"].spectrum.main.shape.evaluate_at, **parameters)
     print(results.optimized_model["source"])
 
-    else:
-    # Eseguo il fit statistico e la propagazione dell'errore per questa configurazione
-    like = JointLikelihood(model, DataList(cosi), verbose=False)
-    results, like_df = like.fit()
-    log_step("Fit statistico (like.fit)")
-    print(results)
-    print(like_df)
-
-    results = like.results
-    print(results.display())
-
-    parameters = {
-        par.name: results.get_variates(par.path)
-        for par in results.optimized_model["source"].parameters.values()
-        if par.free
-    }
-    results_err = results.propagate(results.optimized_model["source"].spectrum.main.shape.evaluate_at, **parameters)
-    print(results.optimized_model["source"])
-
     # Verifico unità, limiti e valore ottimizzato del parametro K
     k_par = results.optimized_model["source"].spectrum.main.shape.K
     print("K value:", k_par.value, "| unit:", k_par.unit, "| min/max:", k_par.min_value, k_par.max_value)
@@ -324,7 +305,7 @@ else:
     # Controllo il flusso differenziale propagato a 100 keV e il flusso integrato in banda COSI
     flux_100 = results_err(100.0)
     print("dN/dE(100 keV) median / 68% CI:", flux_100.median, flux_100.equal_tail_interval(cl=0.68))
-    print("Integrated flux (100 keV - 10 MeV):", results.get_flux(100 * u.keV, 10 * u.MeV))[cite: 3]
+    print("Integrated flux (100 keV - 10 MeV):", results.get_flux(100 * u.keV, 10 * u.MeV))
 
     # Calcolo lo spettro fittato e la banda d'errore al 68%
     flux_lo = np.zeros_like(energy)
@@ -401,7 +382,7 @@ fit_label = (
 )
 
 ax.plot(energy, energy**2 * flux_median, color="royalblue", label=fit_label)
-ax.fill_between(energy, energy**2 * flux_lo, energy**2 * flux_hi, alpha=0.25, color="cyan", label="Best fit (errors)")
+ax.fill_between(energy, energy**2 * flux_lo, energy**2 * flux_hi, alpha=0.25, color="royalblue", label="Best fit (errors)")
 
 ax.set_xscale("log")
 ax.set_yscale("log")
@@ -438,8 +419,8 @@ bin_sizes = np.diff(binned_energy_edges)
 src_em = source_binned.binned_data.project("Em").to_dense(copy=False).contents
 
 fig, ax = plt.subplots()
-ax.stairs(exp_em, binned_energy_edges, color="cyan", label="Best fit convolved with response")
-ax.errorbar(binned_energy, exp_em, yerr=np.sqrt(exp_em), color="cyan", linewidth=0, elinewidth=1)
+ax.stairs(exp_em, binned_energy_edges, color="royalblue", label="Best fit convolved with response")
+ax.errorbar(binned_energy, exp_em, yerr=np.sqrt(exp_em), color="royalblue", linewidth=0, elinewidth=1)
 ax.stairs(src_em, binned_energy_edges, color="black", ls=":", label="Source counts")
 ax.errorbar(binned_energy, src_em, yerr=np.sqrt(src_em), color="black", linewidth=0, elinewidth=1)
 
@@ -457,8 +438,8 @@ tot_em = data.data.project("Em").to_dense(copy=False).contents
 total_model_em = exp_em + exp_bkg_em
 
 fig, ax = plt.subplots()
-ax.stairs(total_model_em, binned_energy_edges, color="cyan", label="Best fit convolved with response plus background")
-ax.errorbar(binned_energy, total_model_em, yerr=np.sqrt(total_model_em), color="cyan", linewidth=0, elinewidth=1)
+ax.stairs(total_model_em, binned_energy_edges, color="royalblue", label="Best fit convolved with response plus background")
+ax.errorbar(binned_energy, total_model_em, yerr=np.sqrt(total_model_em), color="royalblue", linewidth=0, elinewidth=1)
 ax.stairs(tot_em, binned_energy_edges, color="black", ls=":", label="Total counts")
 ax.errorbar(binned_energy, tot_em, yerr=np.sqrt(tot_em), color="black", linewidth=0, elinewidth=1)
 
@@ -470,15 +451,6 @@ ax.legend()
 ax.figure.savefig(output_dir / "convolved_spectrum_vs_fit_with_background.png", dpi=200, bbox_inches="tight")
 plt.close(fig)
 log_step("Plot spettro convoluto + fondo vs totali (convolved_spectrum_vs_fit_with_background.png)")
-
-# Verifico unità, limiti e valore ottimizzato del parametro K
-k_par = results.optimized_model["source"].spectrum.main.shape.K
-print("K value:", k_par.value, "| unit:", k_par.unit, "| min/max:", k_par.min_value, k_par.max_value)
-
-# Controllo il flusso differenziale propagato a 100 keV e il flusso integrato in banda COSI
-flux_100 = results_err(100.0)
-print("dN/dE(100 keV) median / 68% CI:", flux_100.median, flux_100.equal_tail_interval(cl=0.68))
-print("Integrated flux (100 keV - 10 MeV):", results.get_point_source_flux(100 * u.keV, 10 * u.MeV))
 
 elapsed = time.perf_counter() - t_start
 minutes, seconds = divmod(elapsed, 60)
