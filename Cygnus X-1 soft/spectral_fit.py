@@ -443,6 +443,15 @@ ax.figure.savefig(output_dir / "convolved_spectrum_vs_fit_with_background.png", 
 plt.close(fig)
 log_step("Plot spettro convoluto + fondo vs totali (convolved_spectrum_vs_fit_with_background.png)")
 
+# Verifico unità, limiti e valore ottimizzato del parametro K
+k_par = results.optimized_model["source"].spectrum.main.shape.K
+print("K value:", k_par.value, "| unit:", k_par.unit, "| min/max:", k_par.min_value, k_par.max_value)
+
+# Controllo il flusso differenziale propagato a 100 keV e il flusso integrato in banda COSI
+flux_100 = results_err(100.0)
+print("dN/dE(100 keV) median / 68% CI:", flux_100.median, flux_100.equal_tail_interval(cl=0.68))
+print("Integrated flux (100 keV - 10 MeV):", results.get_point_source_flux(100 * u.keV, 10 * u.MeV))
+
 elapsed = time.perf_counter() - t_start
 minutes, seconds = divmod(elapsed, 60)
 print(f"Tempo totale di esecuzione: {int(minutes)}m {seconds:.2f}s ({elapsed:.2f}s)")
