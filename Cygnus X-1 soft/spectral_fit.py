@@ -311,12 +311,12 @@ else:
 
     spec_opt = results.optimized_model["source"].spectrum.main.shape
     k_val = float(spec_opt.K.value)
-    idx1_val = float(spec_opt.index_1.value)
-    idx2_val = float(spec_opt.index_2.value)
-    break_val = float(spec_opt.break_energy.value)
+    idx1_val = float(spec_opt.alpha.value)
+    idx2_val = float(spec_opt.beta.value)
+    break_val = float(spec_opt.xb.value)
     k_err = float(results.get_variates(spec_opt.K.path).std)
-    idx1_err = float(results.get_variates(spec_opt.index_1.path).std)
-    idx2_err = float(results.get_variates(spec_opt.index_2.path).std)
+    idx1_err = float(results.get_variates(spec_opt.alpha.path).std)
+    idx2_err = float(results.get_variates(spec_opt.beta.path).std)
 
     expectation = response.expectation()
     expectation_bkg = bkg.expectation(copy=True)
