@@ -23,13 +23,14 @@ def power_model(index=-2.7, piv=100.0 * u.keV, K=8.6e-5 / u.cm / u.cm / u.s / u.
 
     return spectrum  # restituisco il modello spettrale configurato
 
+
 def broken_power_model(
     index_1=-2.65,
     index_2=-2.75,
     break_energy=350.0 * u.keV,
     K=1.7e-6 / u.cm / u.cm / u.s / u.keV,
 ):
-    spectrum = BrokenPowerlaw()  # creo il modello spettrale a legge di potenza spezzata non smooth
+    spectrum = Broken_powerlaw()  # creo il modello spettrale a legge di potenza spezzata non smooth
 
     spectrum.index_1.min_value = -6.0  # imposto il limite inferiore per il primo indice spettrale
     spectrum.index_1.max_value = 2.0  # imposto il limite superiore per il primo indice spettrale

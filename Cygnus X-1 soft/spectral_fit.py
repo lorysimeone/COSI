@@ -26,7 +26,7 @@ _fit_function_dir = Path("/heronas/simeone/COSI/Cygnus X-1 soft/model")
 if str(_fit_function_dir) not in _sys.path:
     _sys.path.insert(0, str(_fit_function_dir))
 
-from fit_function import Broken_powerlaw
+from fit_function import broken_power_model
 
 logging.basicConfig(level=logging.INFO)  # attivo i log informativi durante l'esecuzione
 
