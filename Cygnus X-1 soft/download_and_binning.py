@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 
 import astropy.units as u
+from astropy.coordinates import SkyCoord
 from cosipy import BinnedData
 from cosipy.spacecraftfile import SpacecraftHistory
 from cosipy.response.FullDetectorResponse import FullDetectorResponse
@@ -16,7 +17,6 @@ from cosipy.response import BinnedInstrumentResponse, BinnedThreeMLPointSourceRe
 from cosipy.data_io import EmCDSBinnedData
 from cosipy.util import fetch_wasabi_file
 from histpy import Histogram
-from threeML import PointSource
 
 logging.basicConfig(level=logging.INFO)  # attivo i log informativi durante download, binning e preparazione
 
@@ -135,9 +135,9 @@ def build_and_cache_psr(
         polarization_axis=dr.axes["Pol"] if "Pol" in dr.axes.labels else None,
         nside=nside,
     )
-    point_source = PointSource("source", l=l, b=b)
+    coord = SkyCoord(l=l * u.deg, b=b * u.deg, frame="galactic")
     psr_instance = psr_builder.copy()
-    psr_instance.set_source(point_source)
+    psr_instance.convolve_source_skycoord(coord)
 
     try:
         CACHE_PSR_DIR.mkdir(parents=True, exist_ok=True)
