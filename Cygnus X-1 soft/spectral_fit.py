@@ -271,6 +271,13 @@ if fit_cache_path.exists():
     flux_hi = fit_payload["flux_hi"]
     k_val = fit_payload["k_val"]
     k_err = fit_payload["k_err"]
+    flux_ref_val = fit_payload.get("flux_ref_val", float(np.interp(fit_payload["break_val"], energy, flux_median)))
+    flux_ref_lo = fit_payload.get("flux_ref_lo", float(np.interp(fit_payload["break_val"], energy, flux_lo)))
+    flux_ref_hi = fit_payload.get("flux_ref_hi", float(np.interp(fit_payload["break_val"], energy, flux_hi)))
+    int_flux_val = fit_payload.get("int_flux_val", None)
+    int_flux_lo = fit_payload.get("int_flux_lo", None)
+    int_flux_hi = fit_payload.get("int_flux_hi", None)
+    int_flux_unit = fit_payload.get("int_flux_unit", "erg / (s cm2)")
     idx1_val = fit_payload["idx1_val"]
     idx1_err = fit_payload["idx1_err"]
     idx2_val = fit_payload["idx2_val"]
@@ -298,15 +305,6 @@ else:
     results_err = results.propagate(results.optimized_model["source"].spectrum.main.shape.evaluate_at, **parameters)
     print(results.optimized_model["source"])
 
-    # Verifico unità, limiti e valore ottimizzato del parametro K
-    k_par = results.optimized_model["source"].spectrum.main.shape.K
-    print("K value:", k_par.value, "| unit:", k_par.unit, "| min/max:", k_par.min_value, k_par.max_value)
-
-    # Controllo il flusso differenziale propagato a 100 keV e il flusso integrato in banda COSI
-    flux_100 = results_err(100.0)
-    print("dN/dE(100 keV) median / 68% CI:", flux_100.median, flux_100.equal_tail_interval(cl=0.68))
-    print("Integrated flux (100 keV - 10 MeV):", results.get_flux(100 * u.keV, 10 * u.MeV))
-
     # Calcolo lo spettro fittato e la banda d'errore al 68%
     flux_lo = np.zeros_like(energy)
     flux_median = np.zeros_like(energy)
@@ -327,6 +325,18 @@ else:
     idx1_err = float(results.get_variates(spec_opt.alpha.path).std)
     idx2_err = float(results.get_variates(spec_opt.beta.path).std)
 
+    # Valuto il flusso differenziale propagato all'energia di riferimento (break_val)
+    flux_ref = results_err(break_val)
+    flux_ref_val = float(flux_ref.median)
+    flux_ref_lo, flux_ref_hi = [float(x) for x in flux_ref.equal_tail_interval(cl=0.68)]
+
+    # Calcolo il flusso integrato nella banda 100 keV - 10 MeV sul modello ottimizzato
+    int_flux_df = results.get_flux(100 * u.keV, 10 * u.MeV)
+    int_flux_val = float(int_flux_df["flux"].iloc[0])
+    int_flux_lo = float(int_flux_df["low bound"].iloc[0])
+    int_flux_hi = float(int_flux_df["hi bound"].iloc[0])
+    int_flux_unit = str(int_flux_df["flux"].iloc[0].unit) if hasattr(int_flux_df["flux"].iloc[0], "unit") else "erg / (s cm2)"
+
     expectation = response.expectation()
     expectation_bkg = bkg.expectation(copy=True)
     exp_em = np.asarray(expectation.project("Em").to_dense(copy=False).contents)
@@ -339,6 +349,13 @@ else:
         "flux_hi": flux_hi,
         "k_val": k_val,
         "k_err": k_err,
+        "flux_ref_val": flux_ref_val,
+        "flux_ref_lo": flux_ref_lo,
+        "flux_ref_hi": flux_ref_hi,
+        "int_flux_val": int_flux_val,
+        "int_flux_lo": int_flux_lo,
+        "int_flux_hi": int_flux_hi,
+        "int_flux_unit": int_flux_unit,
         "idx1_val": idx1_val,
         "idx1_err": idx1_err,
         "idx2_val": idx2_val,
@@ -374,9 +391,17 @@ dat_fluxes = np.array(dat_fluxes)
 
 ax.scatter(dat_energies, dat_energies**2 * dat_fluxes, color="black", s=6, zorder=4, label="cygX1_soft_spec.dat")
 
+flux_ref_sym_err = 0.5 * ((flux_ref_hi - flux_ref_val) + (flux_ref_val - flux_ref_lo))
+int_flux_line = (
+    f"F(100 keV–10 MeV) = {int_flux_val:.2e} ({int_flux_unit})\n"
+    if int_flux_val is not None
+    else ""
+)
 fit_label = (
     f"Best fit\n"
-    f"K = {k_val:.2e} ± {k_err:.2e} (at {break_val:g} keV)\n"
+    f"dN/dE = {flux_ref_val:.2e} ± {flux_ref_sym_err:.2e} ph/(cm² s keV) (at {break_val:g} keV)\n"
+    f"K_param = {k_val:.2e} ± {k_err:.2e}\n"
+    f"{int_flux_line}"
     f"\u0393_1 = {idx1_val:.2f} ± {idx1_err:.2f}\n"
     f"\u0393_2 = {idx2_val:.2f} ± {idx2_err:.2f}"
 )
