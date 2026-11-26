@@ -4,3 +4,9 @@
 *.hdf5
 *.gz
 *.git
+
+# Cartelle di cache (COSI)
+cache_psr/
+cache_bkg/
+cache_sc/
+cache_fit/

@@ -49,7 +49,7 @@ import matplotlib.pyplot as plt
 from threeML import PointSource, Model, JointLikelihood, DataList
 from astromodels import Parameter
 
-CACHE_ROOT_DIR = Path("/home/lorysimeone/COSI")
+CACHE_ROOT_DIR = Path("/heronas/simeone/COSI")
 CACHE_PSR_DIR = CACHE_ROOT_DIR / "cache_psr"
 CACHE_BKG_DIR = CACHE_ROOT_DIR / "cache_bkg"
 CACHE_SC_DIR = CACHE_ROOT_DIR / "cache_sc"
@@ -128,7 +128,7 @@ def get_cached_fit_path(
 def attach_cached_psr(psr_template, cache_path: Path, point_source: PointSource):
     # Collego la PSR pre-calcolata alle copie generate durante il folding
     if not cache_path.exists():
-        raise FileNotFoundError(f"PSR in cache non trovata ({cache_path}). Esegui prima download_and_binning_data.")
+        raise FileNotFoundError(f"PSR in cache non trovata ({cache_path}). Esegui prima download_and_binning.py")
 
     loaded_psr = PointSourceResponse.open(cache_path)
     coord = point_source.position.sky_coord.copy()
