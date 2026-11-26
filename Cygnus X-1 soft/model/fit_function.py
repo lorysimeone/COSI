@@ -28,7 +28,7 @@ def broken_power_model(
     index_1=-2.65,
     index_2=-2.75,
     break_energy=1000.0 * u.keV,
-    K=2.7e-6 / u.cm / u.cm / u.s / u.keV,
+    K=17.0 / u.cm / u.cm / u.s / u.keV,  # K e' la normalizzazione a piv = 1 keV: K ~ 8.5e-5 * 100**(-index_1)
 ):
     spectrum = Broken_powerlaw()  # creo il modello spettrale a legge di potenza spezzata non smooth
 
@@ -40,14 +40,14 @@ def broken_power_model(
     spectrum.beta.max_value = 2.0  # imposto il limite superiore per il secondo indice spettrale
     spectrum.beta.delta = 0.05  # imposto il passo iniziale per il secondo indice spettrale
 
-    spectrum.xb.min_value = 100.0  # imposto il limite inferiore per l'energia di break (keV, inizio del range dei dati)
-    spectrum.xb.max_value = 10000.0  # imposto il limite superiore per l'energia di break (keV, fine del range dei dati)
-    spectrum.xb.delta = 50.0  # imposto il passo iniziale per l'energia di break
-
     spectrum.K.value = K.value  # imposto il valore iniziale della normalizzazione
     spectrum.xb.value = break_energy.value  # imposto l'energia di break iniziale
     spectrum.alpha.value = index_1  # imposto il primo indice spettrale iniziale
     spectrum.beta.value = index_2  # imposto il secondo indice spettrale iniziale
+
+    spectrum.xb.min_value = 100.0  # imposto il limite inferiore per l'energia di break (keV, inizio del range dei dati)
+    spectrum.xb.max_value = 10000.0  # imposto il limite superiore per l'energia di break (keV, fine del range dei dati)
+    spectrum.xb.delta = 50.0  # imposto il passo iniziale per l'energia di break
 
     spectrum.K.unit = K.unit  # assegno l'unità di misura alla normalizzazione
     spectrum.xb.unit = break_energy.unit  # assegno l'unità di misura all'energia di break

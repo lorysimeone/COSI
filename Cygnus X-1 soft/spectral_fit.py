@@ -334,10 +334,16 @@ else:
 
     # Calcolo il flusso integrato nella banda 100 keV - 10 MeV sul modello ottimizzato
     int_flux_df = results.get_flux(100 * u.keV, 10 * u.MeV)
-    int_flux_val = float(int_flux_df["flux"].iloc[0])
-    int_flux_lo = float(int_flux_df["low bound"].iloc[0])
-    int_flux_hi = float(int_flux_df["hi bound"].iloc[0])
-    int_flux_unit = str(int_flux_df["flux"].iloc[0].unit) if hasattr(int_flux_df["flux"].iloc[0], "unit") else "erg / (s cm2)"
+    # get_flux restituisce Quantity in erg/(s cm2): float() diretto fallisce, quindi converto esplicitamente
+    flux_unit = u.erg / (u.cm**2 * u.s)
+
+    def _to_float(x):
+        return float(x.to_value(flux_unit)) if hasattr(x, "to_value") else float(x)
+
+    int_flux_val = _to_float(int_flux_df["flux"].iloc[0])
+    int_flux_lo = _to_float(int_flux_df["low bound"].iloc[0])
+    int_flux_hi = _to_float(int_flux_df["hi bound"].iloc[0])
+    int_flux_unit = str(flux_unit)
 
     expectation = response.expectation()
     expectation_bkg = bkg.expectation(copy=True)
