@@ -410,8 +410,8 @@ bin_sizes = np.diff(binned_energy_edges)
 src_em = source_binned.binned_data.project("Em").to_dense(copy=False).contents
 
 fig, ax = plt.subplots()
-ax.stairs(exp_em, binned_energy_edges, color="purple", label="Best fit convolved with response")
-ax.errorbar(binned_energy, exp_em, yerr=np.sqrt(exp_em), color="purple", linewidth=0, elinewidth=1)
+ax.stairs(exp_em, binned_energy_edges, color="cyan", label="Best fit convolved with response")
+ax.errorbar(binned_energy, exp_em, yerr=np.sqrt(exp_em), color="cyan", linewidth=0, elinewidth=1)
 ax.stairs(src_em, binned_energy_edges, color="black", ls=":", label="Source counts")
 ax.errorbar(binned_energy, src_em, yerr=np.sqrt(src_em), color="black", linewidth=0, elinewidth=1)
 
@@ -429,8 +429,8 @@ tot_em = data.data.project("Em").to_dense(copy=False).contents
 total_model_em = exp_em + exp_bkg_em
 
 fig, ax = plt.subplots()
-ax.stairs(total_model_em, binned_energy_edges, color="purple", label="Best fit convolved with response plus background")
-ax.errorbar(binned_energy, total_model_em, yerr=np.sqrt(total_model_em), color="purple", linewidth=0, elinewidth=1)
+ax.stairs(total_model_em, binned_energy_edges, color="cyan", label="Best fit convolved with response plus background")
+ax.errorbar(binned_energy, total_model_em, yerr=np.sqrt(total_model_em), color="cyan", linewidth=0, elinewidth=1)
 ax.stairs(tot_em, binned_energy_edges, color="black", ls=":", label="Total counts")
 ax.errorbar(binned_energy, tot_em, yerr=np.sqrt(tot_em), color="black", linewidth=0, elinewidth=1)
 
