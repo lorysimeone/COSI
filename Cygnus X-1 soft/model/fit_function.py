@@ -121,12 +121,12 @@ def cutoff_power_model(
     tail = Powerlaw()  # creo la componente a legge di potenza per la coda ad alta energia
 
     cutoff.index.min_value = -6.0  # imposto il limite inferiore per l'indice della cutoff powerlaw
-    cutoff.index.max_value = 2.0  # imposto il limite superiore per l'indice della cutoff powerlaw
+    cutoff.index.max_value = -1.5  # imposto il limite superiore per l'indice della cutoff powerlaw
     cutoff.index.delta = 0.05  # imposto il passo iniziale per l'indice della cutoff powerlaw
 
     cutoff.xc.value = cutoff_energy.value  # imposto l'energia di cutoff iniziale
     cutoff.xc.min_value = 50.0  # imposto il limite inferiore per l'energia di cutoff (keV)
-    cutoff.xc.max_value = 10000.0  # imposto il limite superiore per l'energia di cutoff (keV)
+    cutoff.xc.max_value = 1000.0  # confino l'energia di cutoff termica sotto 1 MeV
     cutoff.xc.delta = 20.0  # imposto il passo iniziale per l'energia di cutoff
 
     cutoff.K.min_value = 1e-15  # imposto il limite inferiore strettamente positivo per la normalizzazione della cutoff powerlaw
@@ -143,8 +143,8 @@ def cutoff_power_model(
     cutoff.xc.free = True  # lascio libera l'energia di cutoff durante il fit
     cutoff.piv.free = False  # tengo fissa l'energia di pivot della cutoff powerlaw a 100 keV
 
-    tail.index.min_value = -6.0  # imposto il limite inferiore per l'indice della powerlaw
-    tail.index.max_value = 2.0  # imposto il limite superiore per l'indice della powerlaw
+    tail.index.min_value = -4.0  # imposto il limite inferiore per l'indice della coda a legge di potenza
+    tail.index.max_value = -1.0  # imposto il limite superiore per l'indice della coda a legge di potenza
     tail.index.delta = 0.05  # imposto il passo iniziale per l'indice della powerlaw
 
     tail.K.min_value = 1e-15  # imposto il limite inferiore strettamente positivo per la normalizzazione della powerlaw
