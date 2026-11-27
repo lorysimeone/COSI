@@ -65,7 +65,7 @@ def smooth_broken_power_model(
     index_1=-2.65,
     index_2=-3.5,
     break_energy=1000.0 * u.keV,
-    break_scale=0.1,
+    break_scale=0.3,
     piv=100.0 * u.keV,
     K=8.6e-5 / u.cm / u.cm / u.s / u.keV,
 ):
