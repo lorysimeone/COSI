@@ -407,7 +407,7 @@ else:
     except Exception as e:
         print("Salvataggio cache fit fallito:", type(e).__name__, e)
 
-# Preparo gli assi energetici binnati e i conteggi per il pannello dei residui
+# Preparo gli assi energetici binnati e i conteggi per i plot successivi
 binned_energy_edges = source_binned.binned_data.axes["Em"].edges.value
 binned_energy = 0.5 * (binned_energy_edges[:-1] + binned_energy_edges[1:])
 bin_sizes = np.diff(binned_energy_edges)
@@ -416,14 +416,8 @@ src_em = source_binned.binned_data.project("Em").to_dense(copy=False).contents
 tot_em = data.data.project("Em").to_dense(copy=False).contents
 total_model_em = exp_em + exp_bkg_em
 
-# Plotto lo spettro fittato con le due componenti separate e i residui normalizzati nel pannello inferiore
-fig, (ax, ax_res) = plt.subplots(
-    2,
-    1,
-    sharex=True,
-    figsize=(8, 6.5),
-    gridspec_kw={"height_ratios": [3, 1], "hspace": 0.08},
-)
+# Plotto lo spettro fittato con le due componenti separate
+fig, ax = plt.subplots()
 
 dat_file_path = data_path_cygnus_soft / "model/cygX1_soft_spec.dat"
 dat_energies = []
@@ -451,11 +445,11 @@ fit_label = (
     f"Best fit (Cutoff PL + PL)\n"
     f"dN/dE = {flux_ref_val:.2e} ± {flux_ref_sym_err:.2e} ph/(cm² s keV) (at {piv_val:g} keV)\n"
     f"{int_flux_line}"
-    f"K_1 = {k1_val:.2e} ± {k1_err:.2e}\n"
-    f"\u0393_1 = {idx1_val:.2f} ± {idx1_err:.2f}\n"
+    f"K_th = {k1_val:.2e} ± {k1_err:.2e}\n"
+    f"\u0393_th = {idx1_val:.2f} ± {idx1_err:.2f}\n"
     f"E_c = {xc_val:.0f} ± {xc_err:.0f} keV\n"
-    f"K_2 = {k2_val:.2e} ± {k2_err:.2e}\n"
-    f"\u0393_2 = {idx2_val:.2f} ± {idx2_err:.2f}"
+    f"K_tail = {k2_val:.2e} ± {k2_err:.2e}\n"
+    f"\u0393_tail = {idx2_val:.2f} ± {idx2_err:.2f}"
 )
 
 ax.plot(energy, energy**2 * flux_best, color="royalblue", lw=2, zorder=3, label=fit_label)
@@ -468,6 +462,7 @@ if flux_tail is not None:
 
 ax.set_xscale("log")
 ax.set_yscale("log")
+ax.set_xlabel("Energy (keV)")
 ax.set_ylabel(r"$E^2 \frac{dN}{dE}$ (keV cm$^{-2}$ s$^{-1}$)")
 
 dat_e2_flux = dat_energies**2 * dat_fluxes
@@ -490,31 +485,11 @@ if y_ref.size > 0:
 
 _ = ax.legend(fontsize=8)
 
-# Calcolo e plotto i residui normalizzati (Dati - Modello) / sqrt(Modello) nel pannello inferiore
-sigma_model = np.sqrt(np.maximum(total_model_em, 1e-12))
-norm_residuals = (tot_em - total_model_em) / sigma_model
-
-ax_res.axhline(0.0, color="gray", ls="-", lw=1)
-ax_res.axhline(1.0, color="gray", ls=":", lw=0.8)
-ax_res.axhline(-1.0, color="gray", ls=":", lw=0.8)
-ax_res.errorbar(
-    binned_energy,
-    norm_residuals,
-    yerr=np.ones_like(norm_residuals),
-    fmt="o",
-    color="black",
-    markersize=4,
-    elinewidth=1,
-)
-ax_res.set_xscale("log")
-ax_res.set_xlabel("Energy (keV)")
-ax_res.set_ylabel(r"Residuals ($\sigma$)")
-
 output_dir = Path("spectra_figures")
 output_dir.mkdir(parents=True, exist_ok=True)
 fig.savefig(output_dir / "fitted_spectrum_power_law.png", dpi=200, bbox_inches="tight")
 plt.close(fig)
-log_step("Plot spettro fittato con componenti e residui (fitted_spectrum_power_law.png)")
+log_step("Plot spettro fittato con componenti (fitted_spectrum_power_law.png)")
 
 # Plotto lo spettro convoluto con la risposta e i conteggi della sorgente
 fig, ax = plt.subplots()
