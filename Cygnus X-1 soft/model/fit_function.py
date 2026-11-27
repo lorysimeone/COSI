@@ -102,7 +102,7 @@ def smooth_broken_power_model(
     spectrum.alpha.free = True  # lascio libero il primo indice spettrale durante il fit
     spectrum.beta.free = True  # lascio libero il secondo indice spettrale durante il fit
     spectrum.break_energy.free = True  # lascio libera l'energia di break durante il fit
-    spectrum.break_scale.free = False  # tengo fisso il parametro di smussamento per evitare degenerazioni
+    spectrum.break_scale.free = True  # lascio libero il parametro di smussamento durante il fit
     spectrum.pivot.free = False  # tengo fissa l'energia di pivot
 
     return spectrum  # restituisco il modello spettrale configurato

@@ -285,6 +285,7 @@ if fit_cache_path.exists():
     break_val = fit_payload["break_val"]
     break_err = fit_payload.get("break_err", float("nan"))
     break_scale_val = fit_payload.get("break_scale_val", None)
+    break_scale_err = fit_payload.get("break_scale_err", None)  # recupero anche l'incertezza di break_scale dalla cache
     exp_em = fit_payload["exp_em"]
     exp_bkg_em = fit_payload["exp_bkg_em"]
     log_step("Caricamento fit ed errori da cache")
@@ -328,7 +329,13 @@ else:
     idx1_err = float(results.get_variates(spec_opt.alpha.path).std)
     idx2_err = float(results.get_variates(spec_opt.beta.path).std)
     break_err = float(results.get_variates(break_par.path).std) if break_par.free else 0.0
-    break_scale_val = float(spec_opt.break_scale.value) if hasattr(spec_opt, "break_scale") else None
+    if hasattr(spec_opt, "break_scale"):
+        break_scale_val = float(spec_opt.break_scale.value)
+        # Estraggo la deviazione standard di break_scale se il parametro è libero nel fit
+        break_scale_err = float(results.get_variates(spec_opt.break_scale.path).std) if spec_opt.break_scale.free else None
+    else:
+        break_scale_val = None
+        break_scale_err = None
 
     # Valuto il flusso differenziale propagato all'energia di riferimento (break_val)
     flux_ref = results_err(break_val)
@@ -374,6 +381,7 @@ else:
         "break_val": break_val,
         "break_err": break_err,
         "break_scale_val": break_scale_val,
+        "break_scale_err": break_scale_err,  # salvo l'errore di break_scale nel payload di cache
         "exp_em": exp_em,
         "exp_bkg_em": exp_bkg_em,
     }
@@ -410,11 +418,14 @@ int_flux_line = (
     if int_flux_val is not None
     else ""
 )
-break_scale_line = (
-    f"\n\u0394 = {break_scale_val:g} (fixed)"
-    if break_scale_val is not None
-    else ""
-)
+if break_scale_val is not None:
+    # Mostro valore ed errore di delta se il parametro è libero, altrimenti segnalo che è fisso
+    if break_scale_err is not None and not np.isnan(break_scale_err):
+        break_scale_line = f"\n\u0394 = {break_scale_val:.2f} ± {break_scale_err:.2f}"
+    else:
+        break_scale_line = f"\n\u0394 = {break_scale_val:g} (fixed)"
+else:
+    break_scale_line = ""
 fit_label = (
     f"Best fit\n"
     f"dN/dE = {flux_ref_val:.2e} ± {flux_ref_sym_err:.2e} ph/(cm² s keV) (at {break_val:g} keV)\n"
