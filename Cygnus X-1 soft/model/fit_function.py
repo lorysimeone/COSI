@@ -88,14 +88,14 @@ def smooth_broken_power_model(
     spectrum.break_scale.delta = 0.05  # imposto il passo iniziale per il parametro di smussamento
 
     spectrum.K.value = K.value  # imposto il valore iniziale della normalizzazione a piv
-    spectrum.piv.value = piv.value  # imposto l'energia di pivot iniziale
+    spectrum.pivot.value = piv.value  # imposto l'energia di pivot iniziale
     spectrum.alpha.value = index_1  # imposto il primo indice spettrale iniziale
     spectrum.beta.value = index_2  # imposto il secondo indice spettrale iniziale
     spectrum.break_energy.value = break_energy.value  # imposto l'energia di break iniziale
     spectrum.break_scale.value = break_scale  # imposto il parametro di smussamento iniziale
 
     spectrum.K.unit = K.unit  # assegno l'unità di misura alla normalizzazione
-    spectrum.piv.unit = piv.unit  # assegno l'unità di misura all'energia di pivot
+    spectrum.pivot.unit = piv.unit  # assegno l'unità di misura all'energia di pivot
     spectrum.break_energy.unit = break_energy.unit  # assegno l'unità di misura all'energia di break
 
     spectrum.K.free = True  # lascio libera la normalizzazione durante il fit
@@ -103,6 +103,6 @@ def smooth_broken_power_model(
     spectrum.beta.free = True  # lascio libero il secondo indice spettrale durante il fit
     spectrum.break_energy.free = True  # lascio libera l'energia di break durante il fit
     spectrum.break_scale.free = False  # tengo fisso il parametro di smussamento per evitare degenerazioni
-    spectrum.piv.free = False  # tengo fissa l'energia di pivot
+    spectrum.pivot.free = False  # tengo fissa l'energia di pivot
 
     return spectrum  # restituisco il modello spettrale configurato
