@@ -26,7 +26,7 @@ _fit_function_dir = Path("/heronas/simeone/COSI/Cygnus X-1 soft/model")
 if str(_fit_function_dir) not in _sys.path:
     _sys.path.insert(0, str(_fit_function_dir))
 
-from fit_function import smooth_broken_power_model
+from fit_function import cutoff_power_model
 
 logging.basicConfig(level=logging.INFO)  # attivo i log informativi durante l'esecuzione
 
@@ -223,10 +223,10 @@ cosi, response, bkg, source_binned, data, psr = prepare_cosi_plugin(
 )
 log_step("Preparazione plugin, dati e risposta strumentale")
 
-# Definisco il modello di sorgente puntiforme
+# Definisco il modello di sorgente puntiforme con cutoff powerlaw + powerlaw
 l = 71.33496
 b = 3.066917
-fit_fn = smooth_broken_power_model
+fit_fn = cutoff_power_model
 
 point_source = PointSource("source", l=l, b=b, spectral_shape=fit_fn())
 model = Model(point_source)
@@ -269,23 +269,24 @@ if fit_cache_path.exists():
     flux_median = fit_payload["flux_median"]
     flux_lo = fit_payload["flux_lo"]
     flux_hi = fit_payload["flux_hi"]
-    k_val = fit_payload["k_val"]
-    k_err = fit_payload["k_err"]
-    flux_ref_val = fit_payload.get("flux_ref_val", float(np.interp(fit_payload["break_val"], energy, flux_median)))
-    flux_ref_lo = fit_payload.get("flux_ref_lo", float(np.interp(fit_payload["break_val"], energy, flux_lo)))
-    flux_ref_hi = fit_payload.get("flux_ref_hi", float(np.interp(fit_payload["break_val"], energy, flux_hi)))
+    piv_val = fit_payload.get("piv_val", 100.0)
+    k1_val = fit_payload["k1_val"]
+    k1_err = fit_payload["k1_err"]
+    idx1_val = fit_payload["idx1_val"]
+    idx1_err = fit_payload["idx1_err"]
+    xc_val = fit_payload["xc_val"]
+    xc_err = fit_payload["xc_err"]
+    k2_val = fit_payload["k2_val"]
+    k2_err = fit_payload["k2_err"]
+    idx2_val = fit_payload["idx2_val"]
+    idx2_err = fit_payload["idx2_err"]
+    flux_ref_val = fit_payload.get("flux_ref_val", float(np.interp(piv_val, energy, flux_median)))
+    flux_ref_lo = fit_payload.get("flux_ref_lo", float(np.interp(piv_val, energy, flux_lo)))
+    flux_ref_hi = fit_payload.get("flux_ref_hi", float(np.interp(piv_val, energy, flux_hi)))
     int_flux_val = fit_payload.get("int_flux_val", None)
     int_flux_lo = fit_payload.get("int_flux_lo", None)
     int_flux_hi = fit_payload.get("int_flux_hi", None)
     int_flux_unit = fit_payload.get("int_flux_unit", "erg / (s cm2)")
-    idx1_val = fit_payload["idx1_val"]
-    idx1_err = fit_payload["idx1_err"]
-    idx2_val = fit_payload["idx2_val"]
-    idx2_err = fit_payload["idx2_err"]
-    break_val = fit_payload["break_val"]
-    break_err = fit_payload.get("break_err", float("nan"))
-    break_scale_val = fit_payload.get("break_scale_val", None)
-    break_scale_err = fit_payload.get("break_scale_err", None)  # recupero anche l'incertezza di break_scale dalla cache
     exp_em = fit_payload["exp_em"]
     exp_bkg_em = fit_payload["exp_bkg_em"]
     log_step("Caricamento fit ed errori da cache")
@@ -320,31 +321,27 @@ else:
     log_step("Propagazione errori e intervalli al 68%")
 
     spec_opt = results.optimized_model["source"].spectrum.main.shape
-    k_val = float(spec_opt.K.value)
-    idx1_val = float(spec_opt.alpha.value)
-    idx2_val = float(spec_opt.beta.value)
-    break_par = spec_opt.break_energy if hasattr(spec_opt, "break_energy") else spec_opt.xb
-    break_val = float(break_par.value)
-    k_err = float(results.get_variates(spec_opt.K.path).std)
-    idx1_err = float(results.get_variates(spec_opt.alpha.path).std)
-    idx2_err = float(results.get_variates(spec_opt.beta.path).std)
-    break_err = float(results.get_variates(break_par.path).std) if break_par.free else 0.0
-    if hasattr(spec_opt, "break_scale"):
-        break_scale_val = float(spec_opt.break_scale.value)
-        # Estraggo la deviazione standard di break_scale se il parametro è libero nel fit
-        break_scale_err = float(results.get_variates(spec_opt.break_scale.path).std) if spec_opt.break_scale.free else None
-    else:
-        break_scale_val = None
-        break_scale_err = None
+    xc_par = spec_opt.xc if hasattr(spec_opt, "xc") else spec_opt.xc_1
+    piv_val = float(spec_opt.piv_1.value)
+    k1_val = float(spec_opt.K_1.value)
+    idx1_val = float(spec_opt.index_1.value)
+    xc_val = float(xc_par.value)
+    k2_val = float(spec_opt.K_2.value)
+    idx2_val = float(spec_opt.index_2.value)
 
-    # Valuto il flusso differenziale propagato all'energia di riferimento (break_val)
-    flux_ref = results_err(break_val)
+    k1_err = float(results.get_variates(spec_opt.K_1.path).std)
+    idx1_err = float(results.get_variates(spec_opt.index_1.path).std)
+    xc_err = float(results.get_variates(xc_par.path).std) if xc_par.free else 0.0
+    k2_err = float(results.get_variates(spec_opt.K_2.path).std)
+    idx2_err = float(results.get_variates(spec_opt.index_2.path).std)
+
+    # Valuto il flusso differenziale totale propagato all'energia di pivot (100 keV)
+    flux_ref = results_err(piv_val)
     flux_ref_val = float(flux_ref.median)
     flux_ref_lo, flux_ref_hi = [float(x) for x in flux_ref.equal_tail_interval(cl=0.68)]
 
     # Calcolo il flusso integrato nella banda 100 keV - 10 MeV sul modello ottimizzato
     int_flux_df = results.get_flux(100 * u.keV, 10 * u.MeV)
-    # get_flux restituisce Quantity in erg/(s cm2): float() diretto fallisce, quindi converto esplicitamente
     flux_unit = u.erg / (u.cm**2 * u.s)
 
     def _to_float(x):
@@ -365,8 +362,17 @@ else:
         "flux_median": flux_median,
         "flux_lo": flux_lo,
         "flux_hi": flux_hi,
-        "k_val": k_val,
-        "k_err": k_err,
+        "piv_val": piv_val,
+        "k1_val": k1_val,
+        "k1_err": k1_err,
+        "idx1_val": idx1_val,
+        "idx1_err": idx1_err,
+        "xc_val": xc_val,
+        "xc_err": xc_err,
+        "k2_val": k2_val,
+        "k2_err": k2_err,
+        "idx2_val": idx2_val,
+        "idx2_err": idx2_err,
         "flux_ref_val": flux_ref_val,
         "flux_ref_lo": flux_ref_lo,
         "flux_ref_hi": flux_ref_hi,
@@ -374,14 +380,6 @@ else:
         "int_flux_lo": int_flux_lo,
         "int_flux_hi": int_flux_hi,
         "int_flux_unit": int_flux_unit,
-        "idx1_val": idx1_val,
-        "idx1_err": idx1_err,
-        "idx2_val": idx2_val,
-        "idx2_err": idx2_err,
-        "break_val": break_val,
-        "break_err": break_err,
-        "break_scale_val": break_scale_val,
-        "break_scale_err": break_scale_err,  # salvo l'errore di break_scale nel payload di cache
         "exp_em": exp_em,
         "exp_bkg_em": exp_bkg_em,
     }
@@ -418,23 +416,15 @@ int_flux_line = (
     if int_flux_val is not None
     else ""
 )
-if break_scale_val is not None:
-    # Mostro valore ed errore di delta se il parametro è libero, altrimenti segnalo che è fisso
-    if break_scale_err is not None and not np.isnan(break_scale_err):
-        break_scale_line = f"\n\u0394 = {break_scale_val:.2f} ± {break_scale_err:.2f}"
-    else:
-        break_scale_line = f"\n\u0394 = {break_scale_val:g} (fixed)"
-else:
-    break_scale_line = ""
 fit_label = (
-    f"Best fit\n"
-    f"dN/dE = {flux_ref_val:.2e} ± {flux_ref_sym_err:.2e} ph/(cm² s keV) (at {break_val:g} keV)\n"
-    f"K = {k_val:.2e} ± {k_err:.2e}\n"
+    f"Best fit (Cutoff PL + PL)\n"
+    f"dN/dE = {flux_ref_val:.2e} ± {flux_ref_sym_err:.2e} ph/(cm² s keV) (at {piv_val:g} keV)\n"
     f"{int_flux_line}"
+    f"K_1 = {k1_val:.2e} ± {k1_err:.2e}\n"
     f"\u0393_1 = {idx1_val:.2f} ± {idx1_err:.2f}\n"
-    f"\u0393_2 = {idx2_val:.2f} ± {idx2_err:.2f}\n"
-    f"E_b = {break_val:.0f} ± {break_err:.0f} keV"
-    f"{break_scale_line}"
+    f"E_c = {xc_val:.0f} ± {xc_err:.0f} keV\n"
+    f"K_2 = {k2_val:.2e} ± {k2_err:.2e}\n"
+    f"\u0393_2 = {idx2_val:.2f} ± {idx2_err:.2f}"
 )
 
 ax.plot(energy, energy**2 * flux_median, color="royalblue", label=fit_label)

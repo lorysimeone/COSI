@@ -106,3 +106,55 @@ def smooth_broken_power_model(
     spectrum.pivot.free = False  # tengo fissa l'energia di pivot
 
     return spectrum  # restituisco il modello spettrale configurato
+
+def cutoff_power_model(
+    index_1=-2.65,
+    cutoff_energy=200.0 * u.keV,
+    K_1=1.5e-4 / u.cm / u.cm / u.s / u.keV,
+    index_2=-2.0,
+    K_2=1.0e-5 / u.cm / u.cm / u.s / u.keV,
+    piv=100.0 * u.keV,
+):
+    cutoff = Cutoff_powerlaw()  # creo la componente di Comptonizzazione termica con taglio esponenziale
+    tail = Powerlaw()  # creo la componente a legge di potenza per la coda ad alta energia
+
+    cutoff.index.min_value = -6.0  # imposto il limite inferiore per l'indice della cutoff powerlaw
+    cutoff.index.max_value = 2.0  # imposto il limite superiore per l'indice della cutoff powerlaw
+    cutoff.index.delta = 0.05  # imposto il passo iniziale per l'indice della cutoff powerlaw
+
+    cutoff.xc.min_value = 50.0  # imposto il limite inferiore per l'energia di cutoff (keV)
+    cutoff.xc.max_value = 10000.0  # imposto il limite superiore per l'energia di cutoff (keV)
+    cutoff.xc.delta = 20.0  # imposto il passo iniziale per l'energia di cutoff
+
+    cutoff.K.min_value = 0.0  # imposto il limite inferiore per la normalizzazione della cutoff powerlaw
+    cutoff.K.value = K_1.value  # imposto il valore iniziale della normalizzazione della cutoff powerlaw
+    cutoff.piv.value = piv.value  # imposto l'energia di pivot a 100 keV per la cutoff powerlaw
+    cutoff.index.value = index_1  # imposto l'indice iniziale della cutoff powerlaw
+    cutoff.xc.value = cutoff_energy.value  # imposto l'energia di cutoff iniziale
+
+    cutoff.K.unit = K_1.unit  # assegno l'unità di misura alla normalizzazione della cutoff powerlaw
+    cutoff.piv.unit = piv.unit  # assegno l'unità di misura all'energia di pivot della cutoff powerlaw
+    cutoff.xc.unit = cutoff_energy.unit  # assegno l'unità di misura all'energia di cutoff
+
+    cutoff.K.free = True  # lascio libera la normalizzazione della cutoff powerlaw durante il fit
+    cutoff.index.free = True  # lascio libero l'indice della cutoff powerlaw durante il fit
+    cutoff.xc.free = True  # lascio libera l'energia di cutoff durante il fit
+    cutoff.piv.free = False  # tengo fissa l'energia di pivot della cutoff powerlaw a 100 keV
+
+    tail.index.min_value = -6.0  # imposto il limite inferiore per l'indice della powerlaw
+    tail.index.max_value = 2.0  # imposto il limite superiore per l'indice della powerlaw
+    tail.index.delta = 0.05  # imposto il passo iniziale per l'indice della powerlaw
+
+    tail.K.min_value = 0.0  # imposto il limite inferiore per la normalizzazione della powerlaw
+    tail.K.value = K_2.value  # imposto il valore iniziale della normalizzazione della powerlaw
+    tail.piv.value = piv.value  # imposto l'energia di pivot a 100 keV per la powerlaw
+    tail.index.value = index_2  # imposto l'indice iniziale della powerlaw
+
+    tail.K.unit = K_2.unit  # assegno l'unità di misura alla normalizzazione della powerlaw
+    tail.piv.unit = piv.unit  # assegno l'unità di misura all'energia di pivot della powerlaw
+
+    tail.K.free = True  # lascio libera la normalizzazione della powerlaw durante il fit
+    tail.index.free = True  # lascio libero l'indice della powerlaw durante il fit
+    tail.piv.free = False  # tengo fissa l'energia di pivot della powerlaw a 100 keV
+
+    return cutoff + tail  # restituisco il modello spettrale composto configurato
