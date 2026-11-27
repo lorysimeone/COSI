@@ -108,6 +108,7 @@ def smooth_broken_power_model(
 
     return spectrum  # restituisco il modello spettrale configurato
 
+
 def cutoff_power_model(
     index_1=-2.65,
     cutoff_energy=200.0 * u.keV,
@@ -123,15 +124,15 @@ def cutoff_power_model(
     cutoff.index.max_value = 2.0  # imposto il limite superiore per l'indice della cutoff powerlaw
     cutoff.index.delta = 0.05  # imposto il passo iniziale per l'indice della cutoff powerlaw
 
+    cutoff.xc.value = cutoff_energy.value  # imposto l'energia di cutoff iniziale
     cutoff.xc.min_value = 50.0  # imposto il limite inferiore per l'energia di cutoff (keV)
     cutoff.xc.max_value = 10000.0  # imposto il limite superiore per l'energia di cutoff (keV)
     cutoff.xc.delta = 20.0  # imposto il passo iniziale per l'energia di cutoff
 
-    cutoff.K.min_value = 0.0  # imposto il limite inferiore per la normalizzazione della cutoff powerlaw
+    cutoff.K.min_value = 1e-15  # imposto il limite inferiore strettamente positivo per la normalizzazione della cutoff powerlaw
     cutoff.K.value = K_1.value  # imposto il valore iniziale della normalizzazione della cutoff powerlaw
     cutoff.piv.value = piv.value  # imposto l'energia di pivot a 100 keV per la cutoff powerlaw
     cutoff.index.value = index_1  # imposto l'indice iniziale della cutoff powerlaw
-    cutoff.xc.value = cutoff_energy.value  # imposto l'energia di cutoff iniziale
 
     cutoff.K.unit = K_1.unit  # assegno l'unità di misura alla normalizzazione della cutoff powerlaw
     cutoff.piv.unit = piv.unit  # assegno l'unità di misura all'energia di pivot della cutoff powerlaw
@@ -146,7 +147,7 @@ def cutoff_power_model(
     tail.index.max_value = 2.0  # imposto il limite superiore per l'indice della powerlaw
     tail.index.delta = 0.05  # imposto il passo iniziale per l'indice della powerlaw
 
-    tail.K.min_value = 0.0  # imposto il limite inferiore per la normalizzazione della powerlaw
+    tail.K.min_value = 1e-15  # imposto il limite inferiore strettamente positivo per la normalizzazione della powerlaw
     tail.K.value = K_2.value  # imposto il valore iniziale della normalizzazione della powerlaw
     tail.piv.value = piv.value  # imposto l'energia di pivot a 100 keV per la powerlaw
     tail.index.value = index_2  # imposto l'indice iniziale della powerlaw
