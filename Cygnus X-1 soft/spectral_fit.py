@@ -267,6 +267,9 @@ if fit_cache_path.exists():
 
     energy = fit_payload["energy"]
     flux_median = fit_payload["flux_median"]
+    flux_best = fit_payload.get("flux_best", flux_median)
+    flux_cutoff = fit_payload.get("flux_cutoff", None)
+    flux_tail = fit_payload.get("flux_tail", None)
     flux_lo = fit_payload["flux_lo"]
     flux_hi = fit_payload["flux_hi"]
     piv_val = fit_payload.get("piv_val", 100.0)
@@ -280,7 +283,7 @@ if fit_cache_path.exists():
     k2_err = fit_payload["k2_err"]
     idx2_val = fit_payload["idx2_val"]
     idx2_err = fit_payload["idx2_err"]
-    flux_ref_val = fit_payload.get("flux_ref_val", float(np.interp(piv_val, energy, flux_median)))
+    flux_ref_val = fit_payload.get("flux_ref_val", float(np.interp(piv_val, energy, flux_best)))
     flux_ref_lo = fit_payload.get("flux_ref_lo", float(np.interp(piv_val, energy, flux_lo)))
     flux_ref_hi = fit_payload.get("flux_ref_hi", float(np.interp(piv_val, energy, flux_hi)))
     int_flux_val = fit_payload.get("int_flux_val", None)
@@ -301,15 +304,29 @@ else:
     results = like.results
     print(results.display())
 
-    parameters = {
-        par.name: results.get_variates(par.path)
-        for par in results.optimized_model["source"].parameters.values()
-        if par.free
-    }
-    results_err = results.propagate(results.optimized_model["source"].spectrum.main.shape.evaluate_at, **parameters)
+    spec_opt = results.optimized_model["source"].spectrum.main.shape
+    comp_cutoff, comp_tail = spec_opt.functions
+
+    # Valuto in modo deterministico lo spettro totale ottimizzato e le due singole componenti
+    flux_best = np.asarray(spec_opt(energy), dtype=float)
+    flux_cutoff = np.asarray(comp_cutoff(energy), dtype=float)
+    flux_tail = np.asarray(comp_tail(energy), dtype=float)
+
+    # Filtro eventuali parametri bloccati sul bordo con varianza non fisica prima della propagazione
+    parameters = {}
+    for par in results.optimized_model["source"].parameters.values():
+        if par.free:
+            var = results.get_variates(par.path)
+            at_lower = par.min_value is not None and np.isclose(par.value, par.min_value, rtol=1e-2, atol=1e-14)
+            at_upper = par.max_value is not None and np.isclose(par.value, par.max_value, rtol=1e-2, atol=1e-14)
+            if (at_lower or at_upper) and var.std > 10.0 * max(abs(par.value), 1e-12):
+                continue
+            parameters[par.name] = var
+
+    results_err = results.propagate(spec_opt.evaluate_at, **parameters)
     print(results.optimized_model["source"])
 
-    # Calcolo lo spettro fittato e la banda d'errore al 68%
+    # Calcolo la banda d'errore al 68% attorno al best fit
     flux_lo = np.zeros_like(energy)
     flux_median = np.zeros_like(energy)
     flux_hi = np.zeros_like(energy)
@@ -320,7 +337,6 @@ else:
         flux_lo[i], flux_hi[i] = flux.equal_tail_interval(cl=0.68)
     log_step("Propagazione errori e intervalli al 68%")
 
-    spec_opt = results.optimized_model["source"].spectrum.main.shape
     xc_par = spec_opt.xc if hasattr(spec_opt, "xc") else spec_opt.xc_1
     piv_val = float(spec_opt.piv_1.value)
     k1_val = float(spec_opt.K_1.value)
@@ -335,21 +351,18 @@ else:
     k2_err = float(results.get_variates(spec_opt.K_2.path).std)
     idx2_err = float(results.get_variates(spec_opt.index_2.path).std)
 
-    # Valuto il flusso differenziale totale propagato all'energia di pivot (100 keV)
+    # Valuto il flusso differenziale totale esatto all'energia di pivot (100 keV)
+    flux_ref_val = float(spec_opt(piv_val))
     flux_ref = results_err(piv_val)
-    flux_ref_val = float(flux_ref.median)
     flux_ref_lo, flux_ref_hi = [float(x) for x in flux_ref.equal_tail_interval(cl=0.68)]
 
-    # Calcolo il flusso integrato nella banda 100 keV - 10 MeV sul modello ottimizzato
-    int_flux_df = results.get_flux(100 * u.keV, 10 * u.MeV)
+    # Calcolo il flusso integrato nella banda 100 keV - 10 MeV sul modello deterministico ottimizzato
     flux_unit = u.erg / (u.cm**2 * u.s)
-
-    def _to_float(x):
-        return float(x.to_value(flux_unit)) if hasattr(x, "to_value") else float(x)
-
-    int_flux_val = _to_float(int_flux_df["flux"].iloc[0])
-    int_flux_lo = _to_float(int_flux_df["low bound"].iloc[0])
-    int_flux_hi = _to_float(int_flux_df["hi bound"].iloc[0])
+    e_int_grid = np.geomspace(100.0, 10000.0, 2000)
+    kev_to_erg = (1.0 * u.keV).to_value(u.erg)
+    int_flux_val = float(np.trapezoid(e_int_grid * spec_opt(e_int_grid), e_int_grid) * kev_to_erg)
+    int_flux_lo = float(np.trapezoid(e_int_grid * np.interp(e_int_grid, energy, flux_lo), e_int_grid) * kev_to_erg)
+    int_flux_hi = float(np.trapezoid(e_int_grid * np.interp(e_int_grid, energy, flux_hi), e_int_grid) * kev_to_erg)
     int_flux_unit = str(flux_unit)
 
     expectation = response.expectation()
@@ -359,6 +372,9 @@ else:
 
     fit_payload = {
         "energy": energy,
+        "flux_best": flux_best,
+        "flux_cutoff": flux_cutoff,
+        "flux_tail": flux_tail,
         "flux_median": flux_median,
         "flux_lo": flux_lo,
         "flux_hi": flux_hi,
@@ -391,8 +407,23 @@ else:
     except Exception as e:
         print("Salvataggio cache fit fallito:", type(e).__name__, e)
 
-# Plotto lo spettro fittato con i punti del file .dat
-fig, ax = plt.subplots()
+# Preparo gli assi energetici binnati e i conteggi per il pannello dei residui
+binned_energy_edges = source_binned.binned_data.axes["Em"].edges.value
+binned_energy = 0.5 * (binned_energy_edges[:-1] + binned_energy_edges[1:])
+bin_sizes = np.diff(binned_energy_edges)
+
+src_em = source_binned.binned_data.project("Em").to_dense(copy=False).contents
+tot_em = data.data.project("Em").to_dense(copy=False).contents
+total_model_em = exp_em + exp_bkg_em
+
+# Plotto lo spettro fittato con le due componenti separate e i residui normalizzati nel pannello inferiore
+fig, (ax, ax_res) = plt.subplots(
+    2,
+    1,
+    sharex=True,
+    figsize=(8, 6.5),
+    gridspec_kw={"height_ratios": [3, 1], "hspace": 0.08},
+)
 
 dat_file_path = data_path_cygnus_soft / "model/cygX1_soft_spec.dat"
 dat_energies = []
@@ -427,43 +458,65 @@ fit_label = (
     f"\u0393_2 = {idx2_val:.2f} ± {idx2_err:.2f}"
 )
 
-ax.plot(energy, energy**2 * flux_median, color="royalblue", label=fit_label)
-ax.fill_between(energy, energy**2 * flux_lo, energy**2 * flux_hi, alpha=0.25, color="royalblue", label="Best fit (errors)")
+ax.plot(energy, energy**2 * flux_best, color="royalblue", lw=2, zorder=3, label=fit_label)
+ax.fill_between(energy, energy**2 * flux_lo, energy**2 * flux_hi, alpha=0.25, color="royalblue", label="Best fit (68% errors)")
+
+if flux_cutoff is not None:
+    ax.plot(energy, energy**2 * flux_cutoff, color="crimson", ls="--", lw=1.5, label="Cutoff powerlaw (thermal)")
+if flux_tail is not None:
+    ax.plot(energy, energy**2 * flux_tail, color="darkorange", ls=":", lw=1.8, label="Powerlaw (tail)")
 
 ax.set_xscale("log")
 ax.set_yscale("log")
-ax.set_xlabel("Energy (keV)")
 ax.set_ylabel(r"$E^2 \frac{dN}{dE}$ (keV cm$^{-2}$ s$^{-1}$)")
 
 dat_e2_flux = dat_energies**2 * dat_fluxes
-fit_e2_median = energy**2 * flux_median
+fit_e2_best = energy**2 * flux_best
 fit_e2_lo = energy**2 * flux_lo
 fit_e2_hi = energy**2 * flux_hi
 
-y_positive = np.concatenate([
+y_ref = np.concatenate([
     dat_e2_flux[dat_e2_flux > 0],
-    fit_e2_median[fit_e2_median > 0],
-    fit_e2_lo[fit_e2_lo > 0],
+    fit_e2_best[fit_e2_best > 0],
+])
+y_upper = np.concatenate([
+    y_ref,
     fit_e2_hi[fit_e2_hi > 0],
 ])
-if y_positive.size > 0:
-    ax.set_ylim(y_positive.min() * 0.7, y_positive.max() * 1.4)
+if y_ref.size > 0:
+    y_min = y_ref.min() * 0.25
+    if y_upper.size > 0:
+        ax.set_ylim(y_min, y_upper.max() * 1.5)
 
-_ = ax.legend()
+_ = ax.legend(fontsize=8)
+
+# Calcolo e plotto i residui normalizzati (Dati - Modello) / sqrt(Modello) nel pannello inferiore
+sigma_model = np.sqrt(np.maximum(total_model_em, 1e-12))
+norm_residuals = (tot_em - total_model_em) / sigma_model
+
+ax_res.axhline(0.0, color="gray", ls="-", lw=1)
+ax_res.axhline(1.0, color="gray", ls=":", lw=0.8)
+ax_res.axhline(-1.0, color="gray", ls=":", lw=0.8)
+ax_res.errorbar(
+    binned_energy,
+    norm_residuals,
+    yerr=np.ones_like(norm_residuals),
+    fmt="o",
+    color="black",
+    markersize=4,
+    elinewidth=1,
+)
+ax_res.set_xscale("log")
+ax_res.set_xlabel("Energy (keV)")
+ax_res.set_ylabel(r"Residuals ($\sigma$)")
 
 output_dir = Path("spectra_figures")
 output_dir.mkdir(parents=True, exist_ok=True)
-ax.figure.savefig(output_dir / "fitted_spectrum_power_law.png", dpi=200, bbox_inches="tight")
+fig.savefig(output_dir / "fitted_spectrum_power_law.png", dpi=200, bbox_inches="tight")
 plt.close(fig)
-log_step("Plot spettro fittato (fitted_spectrum_power_law.png)")
+log_step("Plot spettro fittato con componenti e residui (fitted_spectrum_power_law.png)")
 
 # Plotto lo spettro convoluto con la risposta e i conteggi della sorgente
-binned_energy_edges = source_binned.binned_data.axes["Em"].edges.value
-binned_energy = 0.5 * (binned_energy_edges[:-1] + binned_energy_edges[1:])
-bin_sizes = np.diff(binned_energy_edges)
-
-src_em = source_binned.binned_data.project("Em").to_dense(copy=False).contents
-
 fig, ax = plt.subplots()
 ax.stairs(exp_em, binned_energy_edges, color="royalblue", label="Best fit convolved with response")
 ax.errorbar(binned_energy, exp_em, yerr=np.sqrt(exp_em), color="royalblue", linewidth=0, elinewidth=1)
@@ -480,9 +533,6 @@ plt.close(fig)
 log_step("Plot spettro convoluto vs sorgente (convolved_spectrum_vs_fit.png)")
 
 # Plotto lo spettro convoluto più il fondo contro i conteggi totali
-tot_em = data.data.project("Em").to_dense(copy=False).contents
-total_model_em = exp_em + exp_bkg_em
-
 fig, ax = plt.subplots()
 ax.stairs(total_model_em, binned_energy_edges, color="royalblue", label="Best fit convolved with response plus background")
 ax.errorbar(binned_energy, total_model_em, yerr=np.sqrt(total_model_em), color="royalblue", linewidth=0, elinewidth=1)
