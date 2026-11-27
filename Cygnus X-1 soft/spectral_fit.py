@@ -26,7 +26,7 @@ _fit_function_dir = Path("/heronas/simeone/COSI/Cygnus X-1 soft/model")
 if str(_fit_function_dir) not in _sys.path:
     _sys.path.insert(0, str(_fit_function_dir))
 
-from fit_function import broken_power_model
+from fit_function import smooth_broken_power_model
 
 logging.basicConfig(level=logging.INFO)  # attivo i log informativi durante l'esecuzione
 
@@ -226,7 +226,7 @@ log_step("Preparazione plugin, dati e risposta strumentale")
 # Definisco il modello di sorgente puntiforme
 l = 71.33496
 b = 3.066917
-fit_fn = broken_power_model
+fit_fn = smooth_broken_power_model
 
 point_source = PointSource("source", l=l, b=b, spectral_shape=fit_fn())
 model = Model(point_source)
@@ -284,6 +284,7 @@ if fit_cache_path.exists():
     idx2_err = fit_payload["idx2_err"]
     break_val = fit_payload["break_val"]
     break_err = fit_payload.get("break_err", float("nan"))
+    break_scale_val = fit_payload.get("break_scale_val", None)
     exp_em = fit_payload["exp_em"]
     exp_bkg_em = fit_payload["exp_bkg_em"]
     log_step("Caricamento fit ed errori da cache")
@@ -321,11 +322,13 @@ else:
     k_val = float(spec_opt.K.value)
     idx1_val = float(spec_opt.alpha.value)
     idx2_val = float(spec_opt.beta.value)
-    break_val = float(spec_opt.xb.value)
+    break_par = spec_opt.break_energy if hasattr(spec_opt, "break_energy") else spec_opt.xb
+    break_val = float(break_par.value)
     k_err = float(results.get_variates(spec_opt.K.path).std)
     idx1_err = float(results.get_variates(spec_opt.alpha.path).std)
     idx2_err = float(results.get_variates(spec_opt.beta.path).std)
-    break_err = float(results.get_variates(spec_opt.xb.path).std)
+    break_err = float(results.get_variates(break_par.path).std) if break_par.free else 0.0
+    break_scale_val = float(spec_opt.break_scale.value) if hasattr(spec_opt, "break_scale") else None
 
     # Valuto il flusso differenziale propagato all'energia di riferimento (break_val)
     flux_ref = results_err(break_val)
@@ -370,6 +373,7 @@ else:
         "idx2_err": idx2_err,
         "break_val": break_val,
         "break_err": break_err,
+        "break_scale_val": break_scale_val,
         "exp_em": exp_em,
         "exp_bkg_em": exp_bkg_em,
     }
@@ -406,6 +410,11 @@ int_flux_line = (
     if int_flux_val is not None
     else ""
 )
+break_scale_line = (
+    f"\n\u0394 = {break_scale_val:g} (fixed)"
+    if break_scale_val is not None
+    else ""
+)
 fit_label = (
     f"Best fit\n"
     f"dN/dE = {flux_ref_val:.2e} ± {flux_ref_sym_err:.2e} ph/(cm² s keV) (at {break_val:g} keV)\n"
@@ -414,6 +423,7 @@ fit_label = (
     f"\u0393_1 = {idx1_val:.2f} ± {idx1_err:.2f}\n"
     f"\u0393_2 = {idx2_val:.2f} ± {idx2_err:.2f}\n"
     f"E_b = {break_val:.0f} ± {break_err:.0f} keV"
+    f"{break_scale_line}"
 )
 
 ax.plot(energy, energy**2 * flux_median, color="royalblue", label=fit_label)
@@ -489,4 +499,4 @@ log_step("Plot spettro convoluto + fondo vs totali (convolved_spectrum_vs_fit_wi
 
 elapsed = time.perf_counter() - t_start
 minutes, seconds = divmod(elapsed, 60)
-print(f"Tempo totale di esecuzione: {int(minutes)}m {seconds:.2f}s ({elapsed:.2f}s)")
+print(f"Tempo totale di esecuzione: {int(minutes)}m {seconds:.2f}s ({elapsed:.2f}s)")
