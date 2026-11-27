@@ -2,6 +2,7 @@ import astropy.units as u
 from astromodels import Powerlaw
 from astromodels import Broken_powerlaw
 from astromodels import SmoothlyBrokenPowerLaw
+from astromodels import Cutoff_powerlaw
 
 
 def power_model(index=-2.7, piv=100.0 * u.keV, K=8.6e-5 / u.cm / u.cm / u.s / u.keV):
